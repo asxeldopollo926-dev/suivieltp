@@ -1,0 +1,14 @@
+# Données personnelles des élèves : jamais dans Git
+uploads/*
+!uploads/.htaccess
+*.zip
+
+# Exports complets de la base (contiennent des données personnelles et des mots de passe hachés)
+ltp.sql
+ltp1.sql
+
+# Divers
+*.log
+.vscode/
+.idea/
+Thumbs.db

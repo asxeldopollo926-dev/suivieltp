@@ -1,0 +1,9 @@
+# Les bulletins ne sont JAMAIS servis directement : ils passent par view_bulletin.php / download_bulletin.php
+# qui contrôlent les droits. Aucun script ne peut s'exécuter ici.
+Require all denied
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .php8 .phar
+RemoveType .php .phtml .php3 .php4 .php5 .php7 .php8 .phar
+Options -ExecCGI -Indexes

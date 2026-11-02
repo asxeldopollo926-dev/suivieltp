@@ -1,0 +1,17 @@
+# SuiviLTP - règles de sécurité Apache
+Options -Indexes
+DirectoryIndex index.php
+
+# Interdire le téléchargement des exports SQL, archives, journaux et fichiers cachés
+<FilesMatch "\.(sql|zip|tar|gz|7z|rar|bak|log|md|ini)$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "same-origin"
+</IfModule>

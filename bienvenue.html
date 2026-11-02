@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenue</title>
+    <style>
+        @font-face {
+            font-family: 'Canaro';
+            src: url('https://fonts.cdnfonts.com/s/17309/Canaro-Light.woff') format('woff');
+            font-weight: normal;
+            font-style: normal;
+        }
+        * {
+            font-family: 'Canaro', Arial, sans-serif;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background: #f8f9fb;
+        }
+        .header {
+            background: #002688;
+            padding: 15px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            flex-wrap: wrap;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .header-left img {
+            width: 32px;
+            height: 32px;
+            background: white;
+            border-radius: 50%;
+            padding: 4px;
+        }
+        .site-name {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+        .header-right {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+        .header-right a {
+            color: white;
+            text-decoration: none;
+            font-size: 1.1em;
+            transition: opacity 0.2s;
+            position: relative;
+            padding: 5px 0;
+        }
+        .header-right a::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: 0;
+            left: 0;
+            background-color: white;
+            transition: width 0.3s ease;
+        }
+        .header-right a:hover::after,
+        .header-right a.active::after {
+            width: 100%;
+        }
+        .header-right a:hover {
+            opacity: 1;
+        }
+        .admin-icon {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .admin-icon:hover {
+            opacity: 0.8;
+        }
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            background-color: #002688;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1001;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .dropdown-content a {
+            color: white;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            transition: background-color 0.3s;
+        }
+        .dropdown-content a:hover {
+            background-color: #0050b3;
+        }
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+        .dropdown:hover .admin-icon {
+            opacity: 0.8;
+        }
+        .main-wrapper {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 70px);
+            width: 100%;
+            max-width: 1400px;
+            margin: 70px auto 0;
+            padding: 40px 20px;
+            box-sizing: border-box;
+            gap: 40px;
+        }
+        .left-col {
+            background: white;
+            border-radius: 40px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+            padding: 48px 40px 48px 48px;
+            max-width: 540px;
+            width: 45%;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            position: relative;
+        }
+        .avis {
+            font-size: 1.3em;
+            color: #002688;
+            font-weight: bold;
+            margin-bottom: 18px;
+            position: relative;
+            padding-left: 15px;
+        }
+        .avis::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 24px;
+            background: #002688;
+            border-radius: 2px;
+        }
+        .desc {
+            color: #222;
+            font-size: 1.25em;
+            line-height: 1.6;
+            margin-bottom: 32px;
+            font-weight: 500;
+        }
+        .start-btn {
+            background: #002688;
+            color: #fff;
+            border: none;
+            padding: 16px 38px;
+            font-size: 1.15em;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            transition: background 0.2s;
+        }
+        .start-btn:hover {
+            background: #0050b3;
+        }
+        .right-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 45%;
+            position: relative;
+        }
+        .slider-container {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .slider-container::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 5px solid #002688;
+            opacity: 0.8;
+            animation: rotate 20s linear infinite;
+        }
+        .slider-container::after {
+            content: '';
+            position: absolute;
+            width: 90%;
+            height: 90%;
+            border-radius: 50%;
+            border: 3px dashed #002688;
+            opacity: 0.4;
+            animation: rotate 15s linear infinite reverse;
+        }
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .slider {
+            width: 85%;
+            max-width: 400px;
+            aspect-ratio: 1;
+            position: relative;
+            overflow: hidden;
+            border-radius: 50%;
+            border: 3px solid #ffffff;
+            box-sizing: border-box;
+            z-index: 1;
+            box-shadow: rgba(14, 30, 37, 0.12) 0px 2px 4px 0px, rgba(14, 30, 37, 0.32) 0px 2px 16px 0px;
+            transition: box-shadow 0.3s ease;
+        }
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            border-radius: 50%;
+            overflow: hidden;
+        }
+        .slide.active {
+            opacity: 1;
+        }
+        .slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+            box-sizing: border-box;
+        }
+        .slider-nav {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 2;
+        }
+        .slider-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+            cursor: pointer;
+            transition: background 0.3s;
+            border: 2px solid #ffffff;
+        }
+        .slider-dot.active {
+            background-color: white;
+        }
+
+        /* Modern 3D Carousel Styles */
+        .card-carousel {
+            display: none;
+            width: 100%;
+            height: 400px;
+            overflow: hidden;
+            position: relative;
+            background: linear-gradient(45deg, #f8f9fb, #ffffff);
+        }
+        .card-carousel-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card {
+            position: absolute;
+            width: 320px;
+            height: 320px;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            overflow: hidden;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            transform: scale(0.9) translateX(100px);
+            pointer-events: none;
+        }
+        .card-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 38, 136, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2em;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .card.active {
+            opacity: 1;
+            transform: scale(1) translateX(0);
+            pointer-events: all;
+            z-index: 2;
+        }
+        .card.prev {
+            opacity: 0.5;
+            transform: scale(0.9) translateX(-100px);
+            z-index: 1;
+        }
+        .card.next {
+            opacity: 0.5;
+            transform: scale(0.9) translateX(100px);
+            z-index: 1;
+        }
+        .card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+        .card-content {
+            padding: 24px;
+            background: white;
+        }
+        .card-title {
+            font-size: 1.4em;
+            color: #002688;
+            margin-bottom: 16px;
+            font-weight: 600;
+            position: relative;
+            padding-left: 16px;
+        }
+        .card-title::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 24px;
+            background: #002688;
+            border-radius: 2px;
+        }
+        .card-text {
+            color: #444;
+            font-size: 1.05em;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .card-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 48px;
+            height: 48px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 3;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .card-arrow:hover {
+            background: #002688;
+            transform: translateY(-50%) scale(1.1);
+        }
+        .card-arrow:hover svg {
+            fill: white;
+        }
+        .card-arrow.prev {
+            left: 20px;
+        }
+        .card-arrow.next {
+            right: 20px;
+        }
+        .card-arrow svg {
+            width: 24px;
+            height: 24px;
+            fill: #002688;
+            transition: fill 0.3s ease;
+        }
+        .card.active .card-overlay {
+            opacity: 1;
+        }
+
+        @media (max-width: 1400px) {
+            .main-wrapper {
+                max-width: 1200px;
+                gap: 30px;
+            }
+            .slider-container {
+                max-width: 400px;
+            }
+            .slider {
+                max-width: 380px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .main-wrapper {
+                max-width: 1000px;
+                gap: 20px;
+            }
+            .slider-container {
+                max-width: 380px;
+            }
+            .slider {
+                max-width: 350px;
+            }
+        }
+
+        @media (max-width: 992px) {
+            .main-wrapper {
+                max-width: 800px;
+            }
+            .slider-container {
+                max-width: 340px;
+            }
+            .slider {
+                max-width: 320px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .main-wrapper {
+                flex-direction: column;
+                padding: 30px 20px;
+                gap: 40px;
+            }
+            .left-col {
+                margin-right: 0;
+                margin-bottom: 0;
+                padding: 0;
+                width: 100%;
+                max-width: 600px;
+                border-radius: 24px;
+                background: transparent;
+                box-shadow: none;
+            }
+            .avis {
+                font-size: 1.8em;
+                margin-bottom: 25px;
+                padding: 0;
+                text-align: center;
+                color: #002688;
+                position: relative;
+                display: inline-block;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+            .avis::before {
+                display: none;
+            }
+            .avis::after {
+                content: '';
+                position: absolute;
+                bottom: -10px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 60px;
+                height: 4px;
+                background: #002688;
+                border-radius: 2px;
+            }
+            .desc {
+                font-size: 1.15em;
+                line-height: 1.6;
+                margin-bottom: 35px;
+                text-align: center;
+                color: #444;
+                padding: 0 15px;
+            }
+            .start-btn {
+                width: 90%;
+                max-width: 300px;
+                padding: 18px 32px;
+                font-size: 1.2em;
+                margin: 0 auto;
+                display: block;
+                border-radius: 35px;
+                background: linear-gradient(135deg, #002688, #0050b3);
+                box-shadow: 0 4px 15px rgba(0, 38, 136, 0.2);
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+            }
+            .start-btn::after {
+                content: 'Commencer';
+            }
+            .start-btn span {
+                display: none;
+            }
+            .right-col {
+                width: 100%;
+            }
+            .slider-container {
+                display: none;
+            }
+            .card-carousel {
+                display: block;
+            }
+            .hamburger {
+                display: flex;
+            }
+            .header-right {
+                display: none;
+            }
+            .header-right.active {
+                display: flex;
+                position: fixed;
+                top: 0;
+                right: 0;
+                width: 80%;
+                max-width: 300px;
+                height: 100vh;
+                background: #002688;
+                flex-direction: column;
+                padding: 80px 30px 30px;
+                box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+                gap: 0;
+            }
+            .header-right a {
+                font-size: 1.2em;
+                padding: 15px 0;
+                width: 100%;
+                text-align: left;
+                opacity: 1;
+            }
+            .header-right a::after {
+                display: none;
+            }
+            .dropdown {
+                width: 100%;
+            }
+            .dropdown-content {
+                position: static;
+                background: transparent;
+                box-shadow: none;
+                display: none;
+                padding-left: 20px;
+            }
+            .dropdown-content a {
+                padding: 12px 0;
+            }
+            .dropdown.active .dropdown-content {
+                display: block;
+            }
+            .hamburger.active span:nth-child(1) {
+                transform: translateY(9px) rotate(45deg);
+            }
+            .hamburger.active span:nth-child(2) {
+                opacity: 0;
+            }
+            .hamburger.active span:nth-child(3) {
+                transform: translateY(-9px) rotate(-45deg);
+            }
+        }
+
+        @media (max-width: 576px) {
+            .main-wrapper {
+                padding: 20px 15px;
+                gap: 30px;
+            }
+            .left-col {
+                padding: 25px 20px;
+                border-radius: 20px;
+            }
+            .slider-container {
+                max-width: 260px;
+            }
+            .slider {
+                max-width: 240px;
+            }
+            .slider-container::before {
+                border-width: 4px;
+            }
+            .slider-container::after {
+                border-width: 2px;
+            }
+            .slider {
+                border-width: 2px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                padding: 10px 15px;
+            }
+            .header-left img {
+                width: 24px;
+                height: 24px;
+            }
+            .site-name {
+                font-size: 1.2em;
+            }
+            .header-right a {
+                font-size: 1em;
+            }
+            .main-wrapper {
+                margin-top: 60px;
+            }
+            .left-col {
+                padding: 0;
+            }
+            .avis {
+                font-size: 1.6em;
+                margin-bottom: 20px;
+            }
+            .avis::after {
+                width: 50px;
+                height: 3px;
+                bottom: -8px;
+            }
+            .desc {
+                font-size: 1.1em;
+                line-height: 1.5;
+                margin-bottom: 30px;
+                padding: 0 10px;
+            }
+            .start-btn {
+                width: 85%;
+                padding: 16px 28px;
+                font-size: 1.15em;
+            }
+            .slider-container {
+                max-width: 220px;
+            }
+            .slider {
+                max-width: 200px;
+            }
+        }
+
+        .hamburger {
+            display: none;
+            background: transparent;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            z-index: 1002;
+        }
+        .hamburger svg {
+            width: 30px;
+            height: 30px;
+        }
+        .hamburger.active svg {
+            transform: rotate(90deg);
+            transition: transform 0.3s ease;
+        }
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            z-index: 1002;
+        }
+        .mobile-menu-btn svg {
+            width: 24px;
+            height: 24px;
+            stroke: white;
+            stroke-width: 2;
+            transition: transform 0.3s ease;
+        }
+        .mobile-menu-btn .menu-icon {
+            display: block;
+        }
+        .mobile-menu-btn .close-icon {
+            display: none;
+        }
+        .mobile-menu-btn.active .menu-icon {
+            display: none;
+        }
+        .mobile-menu-btn.active .close-icon {
+            display: block;
+        }
+        @media (max-width: 900px) {
+            .header {
+                padding: 15px 20px;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .header-right {
+                display: none;
+                position: fixed;
+                top: 0;
+                right: 0;
+                width: 80%;
+                max-width: 300px;
+                height: 100vh;
+                background: #002688;
+                flex-direction: column;
+                padding: 80px 30px 30px;
+                box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            }
+
+            .header-right.active {
+                display: flex;
+            }
+
+            .header-right a {
+                font-size: 1.2em;
+                padding: 15px 0;
+                width: 100%;
+                text-align: left;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .header-right a:last-child {
+                border-bottom: none;
+            }
+
+            .header-right a::after {
+                display: none;
+            }
+
+            .header-right a:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        @media (min-width: 901px) {
+            .mobile-menu-btn {
+                display: none;
+            }
+            .header-right {
+                display: flex;
+                gap: 30px;
+                align-items: center;
+            }
+            .header-right a {
+                color: white;
+                text-decoration: none;
+                font-size: 1.1em;
+                transition: opacity 0.2s;
+                position: relative;
+                padding: 5px 0;
+            }
+            .header-right a::after {
+                content: '';
+                position: absolute;
+                width: 0;
+                height: 2px;
+                bottom: 0;
+                left: 0;
+                background-color: white;
+                transition: width 0.3s ease;
+            }
+            .header-right a:hover::after,
+            .header-right a.active::after {
+                width: 100%;
+            }
+            .header-right a:hover {
+                opacity: 1;
+            }
+            .dropdown {
+                position: relative;
+                display: inline-block;
+            }
+            .dropdown-content {
+                display: none;
+                position: absolute;
+                right: 0;
+                background-color: #002688;
+                min-width: 160px;
+                box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+                z-index: 1001;
+                border-radius: 8px;
+                overflow: hidden;
+            }
+            .dropdown-content a {
+                color: white;
+                padding: 12px 16px;
+                text-decoration: none;
+                display: block;
+                transition: background-color 0.3s;
+            }
+            .dropdown-content a:hover {
+                background-color: #0050b3;
+            }
+            .dropdown:hover .dropdown-content {
+                display: block;
+            }
+            .dropdown:hover .admin-icon {
+                opacity: 0.8;
+            }
+        }
+
+        .mobile-menu {
+            display: none;
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 80%;
+            max-width: 300px;
+            height: 100vh;
+            background: #002688;
+            flex-direction: column;
+            padding: 80px 30px 30px;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            transform: translateX(100%);
+            opacity: 0;
+            transition: transform 1s ease-out, opacity 1s ease-out;
+        }
+
+        .mobile-menu.active {
+            display: flex;
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .mobile-menu a {
+            color: white;
+            text-decoration: none;
+            font-size: 1.2em;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            opacity: 0;
+            transform: translateX(20px);
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+            transition-delay: calc(0.1s * var(--i));
+        }
+
+        .mobile-menu.active a {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .mobile-menu a:last-child {
+            border-bottom: none;
+        }
+
+        .mobile-menu a:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .desktop-menu {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        @media (max-width: 900px) {
+            .desktop-menu {
+                display: none;
+            }
+
+            .mobile-menu {
+                display: none;
+                position: fixed;
+                top: 0;
+                right: 0;
+                width: 80%;
+                max-width: 300px;
+                height: 100vh;
+                background: #002688;
+                flex-direction: column;
+                padding: 80px 30px 30px;
+                box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            }
+
+            .mobile-menu.active {
+                display: flex;
+            }
+
+            .mobile-menu a {
+                font-size: 1.2em;
+                padding: 15px 0;
+                width: 100%;
+                text-align: left;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                color: white;
+                text-decoration: none;
+            }
+
+            .mobile-menu a:last-child {
+                border-bottom: none;
+            }
+
+            .mobile-menu a:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        @media (min-width: 901px) {
+            .mobile-menu-btn {
+                display: none;
+            }
+
+            .desktop-menu a {
+                color: white;
+                text-decoration: none;
+                font-size: 1.1em;
+                transition: opacity 0.2s;
+                position: relative;
+                padding: 5px 0;
+            }
+
+            .desktop-menu a::after {
+                content: '';
+                position: absolute;
+                width: 0;
+                height: 2px;
+                bottom: 0;
+                left: 0;
+                background-color: white;
+                transition: width 0.3s ease;
+            }
+
+            .desktop-menu a:hover::after,
+            .desktop-menu a.active::after {
+                width: 100%;
+            }
+
+            .desktop-menu .dropdown {
+                position: relative;
+                display: inline-block;
+            }
+
+            .desktop-menu .dropdown-content {
+                display: none;
+                position: absolute;
+                right: 0;
+                background-color: #002688;
+                min-width: 160px;
+                box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+                z-index: 1001;
+                border-radius: 8px;
+                overflow: hidden;
+            }
+
+            .desktop-menu .dropdown-content a {
+                padding: 12px 16px;
+            }
+
+            .desktop-menu .dropdown-content a:hover {
+                background-color: #0050b3;
+            }
+
+            .desktop-menu .dropdown:hover .dropdown-content {
+                display: block;
+            }
+
+            .desktop-menu .dropdown:hover .admin-icon {
+                opacity: 0.8;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <img src="assets/logo.svg" alt="Logo SuiviLTP" style="width: 32px; height: 32px; background: white; border-radius: 50%; padding: 4px;">
+            <span class="site-name">SuiviLTP</span>
+        </div>
+
+        <!-- Menu Mobile -->
+        <button class="mobile-menu-btn" aria-label="Menu">
+            <svg class="menu-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 6H20M4 12H20M4 18H20" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <svg class="close-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6 18L18 6M6 6L18 18" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </button>
+        <nav class="mobile-menu">
+            <a href="bienvenue.html" class="active" style="--i: 1">Accueil</a>
+            <a href="savoir_plus.php" style="--i: 2">Savoir +</a>
+            <a href="login_parent.php" style="--i: 3">Parents</a>
+            <a href="loginadmin.php" style="--i: 4">Administration</a>
+            <a href="loginprof.php" style="--i: 5">Professeurs</a>
+        </nav>
+
+        <!-- Menu Desktop -->
+        <nav class="desktop-menu">
+            <a href="bienvenue.html" class="active">Accueil</a>
+            <a href="savoir_plus.php">Savoir +</a>
+            <div class="dropdown">
+                <svg class="admin-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z" stroke="white" stroke-width="2"/>
+                    <path d="M20 21C20 18.8783 19.1571 16.8434 17.6569 15.3431C16.1566 13.8429 14.1217 13 12 13C9.87827 13 7.84344 13.8429 6.34315 15.3431C4.84285 16.8434 4 18.8783 4 21" stroke="white" stroke-width="2"/>
+                </svg>
+                <div class="dropdown-content">
+                    <a href="loginadmin.php">Administration</a>
+                    <a href="loginprof.php">Professeurs</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="main-wrapper">
+        <div class="left-col">
+            <div class="avis">Avis aux parents d'élève</div>
+            <div class="desc">
+                Suivez la scolarité de vos enfants en toute simplicité, où que vous soyez, à tout moment.<br>
+                Accédez facilement à leurs bulletins, leurs présences, et l'état des paiements, directement depuis votre téléphone ou votre ordinateur.
+            </div>
+            <button class="start-btn" onclick="window.location.href='login_parent.php'"><span>Commencer maintenant</span></button>
+        </div>
+        <div class="right-col">
+            <div class="slider-container">
+                <div class="slider">
+                    <div class="slide active">
+                        <img src="assets/bienvenue1.jpg" alt="Bienvenue 1">
+                    </div>
+                    <div class="slide">
+                        <img src="assets/bienvenue2.jpg" alt="Bienvenue 2">
+                    </div>
+                    <div class="slide">
+                        <img src="assets/bienvenue3.jpg" alt="Bienvenue 3">
+                    </div>
+                    <div class="slider-nav">
+                        <div class="slider-dot active"></div>
+                        <div class="slider-dot"></div>
+                        <div class="slider-dot"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-carousel">
+                <div class="card-arrow prev">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                    </svg>
+                </div>
+                <div class="card-carousel-container">
+                    <div class="card">
+                        <img src="assets/bienvenue1.jpg" alt="Bienvenue 1">
+                        <div class="card-overlay">Absence</div>
+                    </div>
+                    <div class="card">
+                        <img src="assets/bienvenue2.jpg" alt="Bienvenue 2">
+                        <div class="card-overlay">Paiement</div>
+                    </div>
+                    <div class="card">
+                        <img src="assets/bienvenue3.jpg" alt="Bienvenue 3">
+                        <div class="card-overlay">Bulletins</div>
+                    </div>
+                </div>
+                <div class="card-arrow next">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Circular slider functionality
+        const slides = document.querySelectorAll('.slide');
+        const dots = document.querySelectorAll('.slider-dot');
+        let currentSlide = 0;
+
+        function showSlide(n) {
+            slides.forEach(slide => slide.classList.remove('active'));
+            dots.forEach(dot => dot.classList.remove('active'));
+            
+            currentSlide = (n + slides.length) % slides.length;
+            
+            slides[currentSlide].classList.add('active');
+            dots[currentSlide].classList.add('active');
+        }
+
+        // Auto-advance slides every 5 seconds
+        setInterval(() => {
+            showSlide(currentSlide + 1);
+        }, 5000);
+
+        // Click handlers for dots
+        dots.forEach((dot, index) => {
+            dot.addEventListener('click', () => {
+                showSlide(index);
+            });
+        });
+
+        // Modern Carousel functionality
+        const cardContainer = document.querySelector('.card-carousel-container');
+        const cards = document.querySelectorAll('.card');
+        const prevBtn = document.querySelector('.card-arrow.prev');
+        const nextBtn = document.querySelector('.card-arrow.next');
+        let currentCard = 0;
+        let startX = 0;
+        let isDown = false;
+
+        function updateCarousel() {
+            cards.forEach((card, index) => {
+                card.classList.remove('active', 'prev', 'next');
+                if (index === currentCard) {
+                    card.classList.add('active');
+                } else if (index === (currentCard - 1 + cards.length) % cards.length) {
+                    card.classList.add('prev');
+                } else if (index === (currentCard + 1) % cards.length) {
+                    card.classList.add('next');
+                }
+            });
+        }
+
+        function showNextCard() {
+            currentCard = (currentCard + 1) % cards.length;
+            updateCarousel();
+        }
+
+        function showPrevCard() {
+            currentCard = (currentCard - 1 + cards.length) % cards.length;
+            updateCarousel();
+        }
+
+        // Touch event handlers
+        cardContainer.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].pageX;
+            isDown = true;
+        });
+
+        cardContainer.addEventListener('touchmove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+        });
+
+        cardContainer.addEventListener('touchend', (e) => {
+            if (!isDown) return;
+            isDown = false;
+            const endX = e.changedTouches[0].pageX;
+            const walk = endX - startX;
+            
+            if (Math.abs(walk) > 50) {
+                if (walk > 0) {
+                    showPrevCard();
+                } else {
+                    showNextCard();
+                }
+            }
+        });
+
+        // Navigation
+        nextBtn.addEventListener('click', showNextCard);
+        prevBtn.addEventListener('click', showPrevCard);
+
+        // Auto-advance
+        setInterval(showNextCard, 5000);
+
+        // Initialize
+        updateCarousel();
+
+        // Mobile menu functionality
+        const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
+        const mobileMenu = document.querySelector('.mobile-menu');
+
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileMenuBtn.classList.toggle('active');
+            mobileMenu.classList.toggle('active');
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 900 && 
+                !e.target.closest('.mobile-menu') && 
+                !e.target.closest('.mobile-menu-btn')) {
+                mobileMenuBtn.classList.remove('active');
+                mobileMenu.classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html> 
