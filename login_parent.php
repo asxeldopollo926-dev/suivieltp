@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Espace parents - SuiviLTP</title>
     <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="assets/css/app.css?v=2">
+    <link rel="stylesheet" href="assets/css/app.css?v=3">
 </head>
 <body class="auth-page">
     <main class="auth-card">

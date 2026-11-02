@@ -8,8 +8,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $eleveId = (int)($_POST['eleve_id'] ?? 0);
-$stmt = $pdo->prepare('SELECT id FROM eleves WHERE id = ?');
-$stmt->execute([$eleveId]);
+$stmt = $pdo->prepare('SELECT id FROM eleves WHERE id = ? AND etablissement_id = ?');
+$stmt->execute([$eleveId, etab_id()]);
 if (!$stmt->fetch()) {
     flash('error', 'Élève introuvable.');
     redirect('paiements.php');

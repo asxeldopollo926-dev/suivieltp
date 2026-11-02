@@ -49,7 +49,7 @@ function layout_start(array $opt): void
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <title><?= e($title) ?> - SuiviLTP</title>
     <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="assets/css/app.css?v=2">
+    <link rel="stylesheet" href="assets/css/app.css?v=3">
     <?= $opt['head'] ?? '' ?>
 </head>
 <body class="area-<?= e($area) ?>">
@@ -58,7 +58,7 @@ function layout_start(array $opt): void
         <div class="header-bar-inner">
             <a class="sidebar-brand" href="parents.php">
                 <img src="assets/logo.svg" alt="">
-                <span>SuiviLTP<small>Espace parents</small></span>
+                <span>SuiviLTP<small>Espace parents · <?= e(current_etab()['nom'] ?? '') ?></small></span>
             </a>
             <a class="btn btn-sm btn-outline" href="logout.php"><?= icon('logout', 16) ?> Déconnexion</a>
         </div>
@@ -72,6 +72,25 @@ function layout_start(array $opt): void
                 <img src="assets/logo.svg" alt="">
                 <span>SuiviLTP<small><?= $area === 'prof' ? 'Espace professeurs' : 'Administration' ?></small></span>
             </a>
+            <?php $etab = current_etab(); if ($etab): ?>
+            <div class="sidebar-etab">
+                <span class="etab-type"><?= icon('building', 14) ?> <?= e(etab_type_name($etab['type'])) ?></span>
+                <?php if ($area === 'admin' && can_switch_etab() && count($allEtabs = etablissements_list()) > 1): ?>
+                <form method="POST" action="changer_etablissement.php">
+                    <?= csrf_field() ?>
+                    <select name="etab_id" data-autosubmit aria-label="Changer d'établissement">
+                        <?php foreach ($allEtabs as $et): ?>
+                            <option value="<?= (int)$et['id'] ?>" <?= (int)$et['id'] === (int)$etab['id'] ? 'selected' : '' ?>>
+                                <?= e(etab_type_name($et['type']) . ' — ' . $et['nom']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </form>
+                <?php else: ?>
+                <strong><?= e($etab['nom']) ?></strong>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
             <ul class="nav">
                 <?php
                 $menu = $area === 'prof' ? PROF_MENU : array_filter(ADMIN_MENU, fn($item) => canAccessPage($item['href']));
@@ -118,7 +137,7 @@ function layout_end(array $opt = []): void
     ?>
         </main>
     </div>
-    <script src="assets/js/app.js?v=2"></script>
+    <script src="assets/js/app.js?v=3"></script>
     <?= $opt['scripts'] ?? '' ?>
 </body>
 </html>

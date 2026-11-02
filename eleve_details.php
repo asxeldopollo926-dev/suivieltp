@@ -6,8 +6,8 @@ require_page_access();
 
 $id = (int)($_GET['id'] ?? 0);
 
-$stmt = $pdo->prepare('SELECT * FROM eleves WHERE id = ?');
-$stmt->execute([$id]);
+$stmt = $pdo->prepare('SELECT * FROM eleves WHERE id = ? AND etablissement_id = ?');
+$stmt->execute([$id, etab_id()]);
 $eleve = $stmt->fetch();
 if (!$eleve) {
     flash('error', 'Élève introuvable.');
@@ -19,13 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     try {
         if ($action === 'delete') {
-            $pdo->prepare('DELETE FROM eleves WHERE id = ?')->execute([$id]);
+            $pdo->prepare('DELETE FROM eleves WHERE id = ? AND etablissement_id = ?')->execute([$id, etab_id()]);
             flash('success', 'L\'élève ' . $eleve['prenoms'] . ' ' . $eleve['nom'] . ' a été supprimé.');
             redirect('eleves.php');
         }
         if ($action === 'regenerate_code') {
             $code = unique_secret_code($pdo);
-            $pdo->prepare('UPDATE eleves SET code_secret = ? WHERE id = ?')->execute([$code, $id]);
+            $pdo->prepare('UPDATE eleves SET code_secret = ? WHERE id = ? AND etablissement_id = ?')->execute([$code, $id, etab_id()]);
             flash('success', "Nouveau code secret : $code. L'ancien code ne fonctionne plus.");
         }
     } catch (Throwable $e) {
@@ -35,8 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Bulletins publiés de sa classe / filière (un par semestre : le plus récent)
-$stmt = $pdo->prepare("SELECT * FROM bulletins WHERE classe = ? AND filiere = ? AND status = 'oui' ORDER BY semestre, date_creation DESC");
-$stmt->execute([$eleve['classe'], $eleve['filiere']]);
+$stmt = $pdo->prepare("SELECT * FROM bulletins WHERE etablissement_id = ? AND classe = ? AND filiere = ? AND status = 'oui' ORDER BY semestre, date_creation DESC");
+$stmt->execute([etab_id(), $eleve['classe'], $eleve['filiere']]);
 $bulletins = [];
 foreach ($stmt->fetchAll() as $b) {
     if (!isset($bulletins[$b['semestre']])) {
@@ -53,7 +53,7 @@ if (canAccessPage('paiement_details.php')) {
 
 layout_start([
     'title'    => $eleve['prenoms'] . ' ' . mb_strtoupper($eleve['nom'], 'UTF-8'),
-    'subtitle' => 'Élève n° ' . $id . ' — ' . $eleve['classe'] . ' ' . $eleve['filiere'],
+    'subtitle' => 'Élève n° ' . $id . ' — ' . classe_label($eleve['classe'], $eleve['filiere']),
     'active'   => 'eleves.php',
     'actions'  => $actions,
 ]);
@@ -67,8 +67,8 @@ layout_start([
             <div><dt>Prénoms</dt><dd><?= e($eleve['prenoms']) ?></dd></div>
             <div><dt>Sexe</dt><dd><?= $eleve['sexe'] === 'F' ? 'Féminin' : 'Masculin' ?></dd></div>
             <div><dt>Date de naissance</dt><dd><?= e(date_fr($eleve['date_naissance'])) ?></dd></div>
-            <div><dt>Filière</dt><dd><span class="badge badge-primary"><?= e($eleve['filiere']) ?></span></dd></div>
             <div><dt>Classe</dt><dd><?= e($eleve['classe']) ?></dd></div>
+            <div><dt><?= e(serie_label()) ?></dt><dd><?= $eleve['filiere'] !== '' ? '<span class="badge badge-primary">' . e($eleve['filiere']) . '</span>' : '<span class="text-muted">—</span>' ?></dd></div>
         </dl>
     </section>
 
@@ -88,6 +88,17 @@ layout_start([
                 </dd>
             </div>
         </dl>
+        <h3 class="mt-3 mb-2" style="font-size:1rem">Parent / tuteur</h3>
+        <dl class="info-list">
+            <div><dt>Nom</dt><dd><?= $eleve['parent_nom'] !== '' ? e($eleve['parent_nom']) : '<span class="text-muted">Non renseigné</span>' ?></dd></div>
+            <div><dt>Téléphone</dt><dd><?= $eleve['parent_telephone'] !== '' ? e($eleve['parent_telephone']) : '<span class="text-muted">Non renseigné</span>' ?></dd></div>
+            <div><dt>E-mail</dt><dd><?= $eleve['parent_email'] !== '' ? e($eleve['parent_email']) : '<span class="text-muted">Non renseigné</span>' ?></dd></div>
+        </dl>
+        <?php if ($eleve['parent_email'] !== ''): ?>
+            <p class="mt-2 mb-0"><span class="badge badge-success"><?= icon('mail', 14) ?> Notifications activées</span> <span class="text-muted">Le parent reçoit les e-mails (absences, bulletins, paiements).</span></p>
+        <?php else: ?>
+            <p class="mt-2 mb-0"><span class="badge badge-warning"><?= icon('mail', 14) ?> Pas de notification</span> <span class="text-muted">Ajoutez un e-mail du parent (Modifier) pour qu'il soit prévenu.</span></p>
+        <?php endif; ?>
         <form method="POST" class="mt-2" data-confirm="Générer un nouveau code secret ? L'ancien code ne permettra plus aux parents de se connecter." data-confirm-label="Régénérer">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="regenerate_code">
@@ -99,7 +110,7 @@ layout_start([
 <section class="card section">
     <div class="card-header"><h2 class="card-title"><?= icon('file') ?> Bulletins</h2></div>
     <?php if (!$bulletins): ?>
-        <div class="empty-state"><?= icon('file', 40) ?><p>Aucun bulletin publié pour la classe <?= e($eleve['classe'] . ' ' . $eleve['filiere']) ?>.</p></div>
+        <div class="empty-state"><?= icon('file', 40) ?><p>Aucun bulletin publié pour la classe <?= e(classe_label($eleve['classe'], $eleve['filiere'])) ?>.</p></div>
     <?php else: ?>
     <div class="table-wrap">
         <table class="table">

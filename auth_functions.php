@@ -10,6 +10,7 @@
  * le menu latéral et les contrôles d'accès se mettent à jour automatiquement.
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/etablissement.php';
 
 /** Rôles disponibles pour le personnel administratif. */
 const ROLES = [
@@ -41,6 +42,10 @@ const ROLE_PAGES = [
     'gestion_professeur.php'    => ['secretaire'],
     'reset_password.php'          => ['secretaire'],
     'utilisateurs.php'            => [],          // administrateur uniquement
+    'etablissements.php'          => [],          // administrateur uniquement
+    'notifications.php'           => [],          // administrateur uniquement
+    'export.php'                  => ['censeur', 'comptable', 'secretaire'], // droits affinés par type d'export
+    'changer_etablissement.php'   => ['censeur', 'comptable', 'secretaire'], // seulement si le compte n'est pas lié à un établissement
 ];
 
 /** Entrées du menu latéral (affichées seulement si l'utilisateur a accès à la page). */
@@ -52,6 +57,8 @@ const ADMIN_MENU = [
     ['href' => 'frais_scolaires.php',    'label' => 'Frais scolaires', 'icon' => 'tag'],
     ['href' => 'gestion_professeur.php', 'label' => 'Professeurs',     'icon' => 'teacher'],
     ['href' => 'utilisateurs.php',       'label' => 'Utilisateurs',    'icon' => 'shield'],
+    ['href' => 'etablissements.php',     'label' => 'Établissements',  'icon' => 'building'],
+    ['href' => 'notifications.php',      'label' => 'Notifications',   'icon' => 'mail'],
     ['href' => 'parametres.php',         'label' => 'Paramètres',      'icon' => 'settings'],
 ];
 
@@ -90,12 +97,26 @@ function getCurrentRoleInfo(): ?array
 }
 
 /** Ouvre la session d'un membre du personnel après vérification du mot de passe. */
-function login_admin(array $user): void
+function login_admin(array $user, int $etabId): void
 {
     session_regenerate_id(true);
     $_SESSION['admin_id']       = (int)$user['id'];
     $_SESSION['admin_username'] = $user['username'];
     $_SESSION['admin_role']     = $user['role'];
+    $_SESSION['admin_etab']     = $user['etablissement_id'] === null ? null : (int)$user['etablissement_id'];
+    $_SESSION['etab_id']        = $etabId;
+}
+
+/** Le compte est-il autorisé dans cet établissement ? (NULL = tous les établissements) */
+function user_can_use_etab(array $user, int $etabId): bool
+{
+    return $user['etablissement_id'] === null || (int)$user['etablissement_id'] === $etabId;
+}
+
+/** Le compte connecté peut-il passer d'un établissement à l'autre ? */
+function can_switch_etab(): bool
+{
+    return isLoggedIn() && ($_SESSION['admin_etab'] ?? null) === null;
 }
 
 /**
@@ -110,14 +131,23 @@ function require_page_access(?string $page = null): void
 
     if (isLoggedIn()) {
         // Le compte peut avoir été supprimé ou son rôle modifié depuis la connexion.
-        $stmt = $pdo->prepare('SELECT id, username, role FROM admin WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT id, username, role, etablissement_id FROM admin WHERE id = ?');
         $stmt->execute([$_SESSION['admin_id']]);
         $user = $stmt->fetch();
         if ($user && isset(ROLES[$user['role']])) {
             $_SESSION['admin_username'] = $user['username'];
             $_SESSION['admin_role'] = $user['role'];
+            $_SESSION['admin_etab'] = $user['etablissement_id'] === null ? null : (int)$user['etablissement_id'];
+            // Établissement de travail : celui du compte s'il y est rattaché, sinon celui choisi (ou le premier).
+            if ($_SESSION['admin_etab'] !== null) {
+                $_SESSION['etab_id'] = $_SESSION['admin_etab'];
+            }
+            if (!etab_id() || !current_etab()) {
+                $first = etablissements_list()[0] ?? null;
+                $_SESSION['etab_id'] = $first ? (int)$first['id'] : 0;
+            }
         } else {
-            unset($_SESSION['admin_id'], $_SESSION['admin_username'], $_SESSION['admin_role']);
+            unset($_SESSION['admin_id'], $_SESSION['admin_username'], $_SESSION['admin_role'], $_SESSION['admin_etab'], $_SESSION['etab_id']);
         }
     }
 
@@ -154,6 +184,7 @@ function require_professeur(): array
         $stmt->execute([$_SESSION['professeur_id']]);
         $prof = $stmt->fetch();
         if ($prof) {
+            set_request_etab((int)$prof['etablissement_id']);
             return $prof;
         }
         unset($_SESSION['professeur_id'], $_SESSION['professeur_nom'], $_SESSION['professeur_prenom']);
@@ -172,6 +203,7 @@ function require_parent(): array
         $stmt->execute([$_SESSION['eleve_id']]);
         $eleve = $stmt->fetch();
         if ($eleve) {
+            set_request_etab((int)$eleve['etablissement_id']);
             return $eleve;
         }
         unset($_SESSION['eleve_id'], $_SESSION['eleve_nom'], $_SESSION['eleve_prenom']);

@@ -33,7 +33,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'chang
     redirect('parametres.php');
 }
 
-$stmt = $pdo->prepare('SELECT username, role, created_at FROM admin WHERE id = ?');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'change_email') {
+    $email = trim($_POST['email'] ?? '');
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        flash('error', 'Adresse e-mail invalide.');
+    } else {
+        try {
+            $pdo->prepare('UPDATE admin SET email = ? WHERE id = ?')->execute([$email, $_SESSION['admin_id']]);
+            flash('success', $email === '' ? 'Adresse e-mail retirée.' : 'Adresse e-mail enregistrée.');
+        } catch (Throwable $e) {
+            flash('error', log_error($e));
+        }
+    }
+    redirect('parametres.php');
+}
+
+$stmt = $pdo->prepare('SELECT username, email, role, etablissement_id, created_at FROM admin WHERE id = ?');
 $stmt->execute([$_SESSION['admin_id']]);
 $account = $stmt->fetch();
 $roleInfo = getCurrentRoleInfo();
@@ -46,9 +61,24 @@ layout_start(['title' => 'Paramètres', 'subtitle' => 'Votre compte et votre mot
         <dl class="info-list">
             <div><dt>Nom d'utilisateur</dt><dd><?= e($account['username']) ?></dd></div>
             <div><dt>Rôle</dt><dd><span class="badge badge-primary"><?= e($roleInfo['name'] ?? '') ?></span></dd></div>
+            <div><dt>Établissement</dt><dd><?php
+                $own = $account['etablissement_id'] !== null ? etablissement((int)$account['etablissement_id']) : null;
+                echo $own ? e(etab_type_name($own['type']) . ' — ' . $own['nom']) : 'Tous les établissements';
+            ?></dd></div>
             <div><dt>Compte créé le</dt><dd><?= e(date_fr($account['created_at'])) ?></dd></div>
         </dl>
-        <p class="text-muted mt-2 mb-0"><?= e($roleInfo['description'] ?? '') ?></p>
+        <p class="text-muted mt-2"><?= e($roleInfo['description'] ?? '') ?></p>
+
+        <form method="POST" class="mt-2">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="change_email">
+            <div class="form-group">
+                <label for="email">Adresse e-mail</label>
+                <input type="email" id="email" name="email" value="<?= e($account['email']) ?>" maxlength="150" placeholder="vous@exemple.com">
+                <p class="form-help">Utilisée pour recevoir un lien en cas de mot de passe oublié.</p>
+            </div>
+            <div class="form-actions mt-0"><button type="submit" class="btn btn-outline">Enregistrer l'e-mail</button></div>
+        </form>
     </section>
 
     <section class="card">

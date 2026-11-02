@@ -63,13 +63,18 @@ function nombre_en_lettres(int $n): string
 
 // ---------------------------------------------------------------------------
 $paiementId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: 0;
-$stmt = $pdo->prepare('SELECT p.*, e.nom, e.prenoms, e.sexe, e.classe, e.filiere
+$stmt = $pdo->prepare('SELECT p.*, e.nom, e.prenoms, e.sexe, e.classe, e.filiere, e.etablissement_id
                        FROM paiements p JOIN eleves e ON e.id = p.eleve_id WHERE p.id = ?');
 $stmt->execute([$paiementId]);
 $paiement = $stmt->fetch();
 
-$isStaff = canAccessPage('recu.php');
 $isParent = $paiement && !empty($_SESSION['eleve_id']) && (int)$_SESSION['eleve_id'] === (int)$paiement['eleve_id'];
+$isStaff = canAccessPage('recu.php');
+// Le personnel ne voit que les reçus de l'établissement sur lequel il travaille.
+if ($isStaff && !$isParent && $paiement && (int)$paiement['etablissement_id'] !== etab_id()) {
+    http_response_code(404);
+    exit('Reçu introuvable dans cet établissement.');
+}
 if (!$isStaff && !$isParent) {
     if (!$paiement && !isLoggedIn() && empty($_SESSION['eleve_id'])) {
         redirect('bienvenue.html');
@@ -92,7 +97,8 @@ $reste = max(0, $du - $cumul);
 
 $montant = (int)round((float)$paiement['montant']);
 $numero = 'REC-' . date('Y', strtotime($paiement['date_paiement'])) . '-' . str_pad((string)$paiement['id'], 6, '0', STR_PAD_LEFT);
-$retour = $isStaff ? 'paiement_details.php?id=' . (int)$paiement['eleve_id'] : 'parents.php';
+$etab = etablissement((int)$paiement['etablissement_id']) ?? ['nom' => '', 'ville' => '', 'contact' => ''];
+$retour = $isStaff && !$isParent ? 'paiement_details.php?id=' . (int)$paiement['eleve_id'] : 'parents.php';
 $nouveau = isset($_GET['nouveau']);
 ?>
 <!DOCTYPE html>
@@ -102,7 +108,7 @@ $nouveau = isset($_GET['nouveau']);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reçu <?= e($numero) ?> - SuiviLTP</title>
     <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="assets/css/app.css?v=2">
+    <link rel="stylesheet" href="assets/css/app.css?v=3">
     <style>
         body { background: var(--bg); }
         .toolbar { max-width: 760px; margin: 24px auto 0; padding: 0 16px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }
@@ -144,8 +150,8 @@ $nouveau = isset($_GET['nouveau']);
         <header class="receipt-head">
             <img src="assets/logo.svg" alt="">
             <div>
-                <h1><?= e(SCHOOL_NAME) ?></h1>
-                <p><?= e(SCHOOL_CITY) ?> — <?= e(SCHOOL_CONTACT) ?></p>
+                <h1><?= e($etab['nom']) ?></h1>
+                <?php $coord = implode(' — ', array_filter([$etab['ville'] ?? '', $etab['contact'] ?? ''])); if ($coord !== ''): ?><p><?= e($coord) ?></p><?php endif; ?>
                 <p>Année scolaire <?= e(annee_scolaire($paiement['date_paiement'])) ?></p>
             </div>
         </header>
@@ -158,7 +164,7 @@ $nouveau = isset($_GET['nouveau']);
         <dl class="info-list">
             <div><dt>Élève</dt><dd><?= e(mb_strtoupper($paiement['nom'], 'UTF-8') . ' ' . $paiement['prenoms']) ?></dd></div>
             <div><dt>Matricule (ID)</dt><dd><?= (int)$paiement['eleve_id'] ?></dd></div>
-            <div><dt>Classe</dt><dd><?= e($paiement['classe'] . ' ' . $paiement['filiere']) ?></dd></div>
+            <div><dt>Classe</dt><dd><?= e(classe_label($paiement['classe'], $paiement['filiere'])) ?></dd></div>
             <div><dt>Date du paiement</dt><dd><?= e(date_fr($paiement['date_paiement'])) ?></dd></div>
             <div><dt>Mode de paiement</dt><dd><?= e($paiement['mode_paiement']) ?></dd></div>
         </dl>
@@ -170,9 +176,9 @@ $nouveau = isset($_GET['nouveau']);
         </div>
 
         <table class="summary">
-            <tr><td>Frais de scolarité annuels</td><td><?= e(fcfa($du)) ?></td></tr>
+            <tr><td>Frais de scolarité annuels</td><td><?= $du > 0 ? e(fcfa($du)) : 'Non défini' ?></td></tr>
             <tr><td>Total versé à cette date (ce paiement inclus)</td><td><?= e(fcfa($cumul)) ?></td></tr>
-            <tr><td>Reste à payer après ce paiement</td><td class="<?= $reste === 0 ? 'text-success' : 'text-danger' ?>"><?= $reste === 0 ? 'Soldé' : e(fcfa($reste)) ?></td></tr>
+            <tr><td>Reste à payer après ce paiement</td><?php if ($du <= 0): ?><td class="text-muted">—</td><?php else: ?><td class="<?= $reste === 0 ? 'text-success' : 'text-danger' ?>"><?= $reste === 0 ? 'Soldé' : e(fcfa($reste)) ?></td><?php endif; ?></tr>
         </table>
 
         <div class="signatures">

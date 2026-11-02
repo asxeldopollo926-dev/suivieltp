@@ -2,13 +2,36 @@
 require_once 'auth_functions.php';
 require_once 'includes/layout.php';
 require_once 'includes/frais.php';
+require_once 'includes/notify.php';
 require_page_access();
 
 const MODES_PAIEMENT = ['Espèces', 'Reçu CLCAM', 'Chèque', 'Mobile Money'];
 
+/** Prévient le parent du paiement. Ne bloque jamais la saisie en cas d'erreur d'envoi. */
+function notifier_paiement(array $eleve, int $paiementId, int $montant, string $date, string $mode, float $dejaPaye, int $du): void
+{
+    try {
+        $totalPaye = (int)round($dejaPaye) + $montant;
+        $numero = 'REC-' . date('Y', strtotime($date)) . '-' . str_pad((string)$paiementId, 6, '0', STR_PAD_LEFT);
+        $resteTxt = $du > 0 ? ($du - $totalPaye <= 0 ? 'Soldé' : fcfa($du - $totalPaye)) : 'non défini';
+        $body = 'Nous vous confirmons la réception d\'un paiement de ' . fcfa($montant)
+              . ' pour ' . mb_strtoupper($eleve['nom'], 'UTF-8') . ' ' . $eleve['prenoms']
+              . ' (' . classe_label($eleve['classe'], $eleve['filiere']) . ").\n\n"
+              . 'Date : ' . date_fr($date) . "\n"
+              . 'Mode de paiement : ' . $mode . "\n"
+              . 'N° de reçu : ' . $numero . "\n"
+              . 'Total versé à ce jour : ' . fcfa($totalPaye) . "\n"
+              . 'Reste à payer : ' . $resteTxt . "\n\n"
+              . 'Le reçu est consultable dans votre espace parents.';
+        notify_parent($eleve, 'paiement', 'Paiement reçu', $body, true);
+    } catch (Throwable $e) {
+        log_error($e);
+    }
+}
+
 $eleveId = (int)($_GET['id'] ?? 0);
-$stmt = $pdo->prepare('SELECT * FROM eleves WHERE id = ?');
-$stmt->execute([$eleveId]);
+$stmt = $pdo->prepare('SELECT * FROM eleves WHERE id = ? AND etablissement_id = ?');
+$stmt->execute([$eleveId, etab_id()]);
 $eleve = $stmt->fetch();
 if (!$eleve) {
     flash('error', 'Élève introuvable.');
@@ -18,7 +41,8 @@ if (!$eleve) {
 $stmt = $pdo->prepare('SELECT COALESCE(SUM(montant), 0) FROM paiements WHERE eleve_id = ?');
 $stmt->execute([$eleveId]);
 $dejaPaye = (float)$stmt->fetchColumn();
-$reste = max(0, montant_total($eleve) - $dejaPaye);
+$du = montant_total($eleve);
+$reste = max(0, $du - $dejaPaye);
 
 $errors = [];
 $form = ['montant' => '', 'mode_paiement' => '', 'date_paiement' => date('Y-m-d')];
@@ -51,8 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->prepare('INSERT INTO paiements (eleve_id, montant, mode_paiement, date_paiement) VALUES (?, ?, ?, ?)')
                 ->execute([$eleveId, (int)$form['montant'], $form['mode_paiement'], $form['date_paiement']]);
+            $paiementId = (int)$pdo->lastInsertId();
+            notifier_paiement($eleve, $paiementId, (int)$form['montant'], $form['date_paiement'], $form['mode_paiement'], $dejaPaye, $du);
             // On ouvre directement le reçu, prêt à être imprimé et remis au parent.
-            redirect('recu.php?id=' . (int)$pdo->lastInsertId() . '&nouveau=1');
+            redirect('recu.php?id=' . $paiementId . '&nouveau=1');
         } catch (Throwable $e) {
             $errors[] = log_error($e);
         }
@@ -61,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 layout_start([
     'title'    => 'Ajouter un paiement',
-    'subtitle' => mb_strtoupper($eleve['nom'], 'UTF-8') . ' ' . $eleve['prenoms'] . ' · ' . $eleve['classe'] . ' ' . $eleve['filiere'],
+    'subtitle' => mb_strtoupper($eleve['nom'], 'UTF-8') . ' ' . $eleve['prenoms'] . ' · ' . classe_label($eleve['classe'], $eleve['filiere']),
     'active'   => 'paiements.php',
     'actions'  => '<a href="paiement_details.php?id=' . $eleveId . '" class="btn btn-secondary">' . icon('arrow-left', 16) . ' Retour</a>',
 ]);
@@ -109,8 +135,8 @@ layout_start([
             <div><dt>Nom</dt><dd><?= e(mb_strtoupper($eleve['nom'], 'UTF-8')) ?></dd></div>
             <div><dt>Prénoms</dt><dd><?= e($eleve['prenoms']) ?></dd></div>
             <div><dt>Classe</dt><dd><?= e($eleve['classe']) ?></dd></div>
-            <div><dt>Filière</dt><dd><?= e($eleve['filiere']) ?></dd></div>
-            <div><dt>Total dû</dt><dd><?= e(fcfa(montant_total($eleve))) ?></dd></div>
+            <div><dt><?= e(serie_label()) ?></dt><dd><?= e($eleve['filiere'] !== '' ? $eleve['filiere'] : '—') ?></dd></div>
+            <div><dt>Total dû</dt><dd><?= $du > 0 ? e(fcfa($du)) : 'Non défini' ?></dd></div>
             <div><dt>Déjà payé</dt><dd><?= e(fcfa($dejaPaye)) ?></dd></div>
         </dl>
     </section>

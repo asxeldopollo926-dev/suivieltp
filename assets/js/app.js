@@ -149,5 +149,31 @@
         });
     }
 
+    // ------------------------------------------------------------------
+    // Listes liées Classe / Série : la série est désactivée pour les classes qui n'en ont pas
+    // (ex. 6e à 3e au collège). Rendu côté serveur par classe_serie_selects().
+    // ------------------------------------------------------------------
+    function syncSerie(classeSelect) {
+        var scope = classeSelect.form || classeSelect.closest('form, .filters, tr') || document;
+        var serie = scope.querySelector('[data-serie-select]');
+        if (!serie) { return; }
+        var sans = [];
+        try { sans = JSON.parse(classeSelect.getAttribute('data-sans-serie') || '[]'); } catch (e) { sans = []; }
+        var noSerie = classeSelect.value !== '' && sans.indexOf(classeSelect.value) !== -1;
+        if (serie.dataset.wasRequired === undefined) { serie.dataset.wasRequired = serie.required ? '1' : '0'; }
+        if (noSerie) {
+            serie.value = '';
+            serie.disabled = true;
+            serie.required = false;
+        } else {
+            serie.disabled = false;
+            serie.required = serie.dataset.wasRequired === '1';
+        }
+    }
+    document.querySelectorAll('[data-classe-select]').forEach(syncSerie);
+    document.addEventListener('change', function (event) {
+        if (event.target.matches('[data-classe-select]')) { syncSerie(event.target); }
+    }, true);
+
     window.App = { openModal: openModal, closeModal: closeModal, confirm: askConfirm, post: post, csrf: CSRF };
 })();

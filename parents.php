@@ -23,24 +23,32 @@ $nbAbsences = count(array_filter($absences, fn($a) => $a['statut'] !== 'En retar
 $nbRetards = count($absences) - $nbAbsences;
 
 // Un bulletin publié par semestre pour la classe/filière de l'enfant
+$etabEleve = (int)$eleve['etablissement_id'];
 $stmt = $pdo->prepare("SELECT b.* FROM bulletins b
-    WHERE b.classe = ? AND b.filiere = ? AND b.status = 'oui'
-      AND b.id IN (SELECT MIN(id) FROM bulletins WHERE classe = ? AND filiere = ? AND status = 'oui' GROUP BY semestre)
+    WHERE b.etablissement_id = ? AND b.classe = ? AND b.filiere = ? AND b.status = 'oui'
+      AND b.id IN (SELECT MIN(id) FROM bulletins WHERE etablissement_id = ? AND classe = ? AND filiere = ? AND status = 'oui' GROUP BY semestre)
     ORDER BY b.semestre");
-$stmt->execute([$eleve['classe'], $eleve['filiere'], $eleve['classe'], $eleve['filiere']]);
+$stmt->execute([$etabEleve, $eleve['classe'], $eleve['filiere'], $etabEleve, $eleve['classe'], $eleve['filiere']]);
 $bulletins = $stmt->fetchAll();
 
+$fraisDefinis = $montantTotal > 0;
+
+$subtitle = 'Classe ' . classe_label($eleve['classe'], $eleve['filiere']);
+if ($eleve['filiere'] !== '') {
+    $subtitle .= ' · ' . serie_label() . ' ' . $eleve['filiere'];
+}
+$subtitle .= ' · ID ' . $eleveId;
 
 layout_start([
     'title'    => $eleve['prenoms'] . ' ' . mb_strtoupper($eleve['nom'], 'UTF-8'),
-    'subtitle' => 'Classe ' . $eleve['classe'] . ' · Filière ' . $eleve['filiere'] . ' · ID ' . $eleveId,
+    'subtitle' => $subtitle,
     'area'     => 'parent',
 ]);
 ?>
 <div class="stats-grid">
     <div class="stat-card">
-        <div class="stat-icon <?= $reste > 0 ? 'warning' : 'success' ?>"><?= icon('wallet', 22) ?></div>
-        <div><div class="stat-label">Reste à payer</div><div class="stat-value"><?= e(fcfa($reste)) ?></div></div>
+        <div class="stat-icon <?= !$fraisDefinis || $reste > 0 ? 'warning' : 'success' ?>"><?= icon('wallet', 22) ?></div>
+        <div><div class="stat-label">Reste à payer</div><div class="stat-value"><?= $fraisDefinis ? e(fcfa($reste)) : '—' ?></div></div>
     </div>
     <div class="stat-card">
         <div class="stat-icon danger"><?= icon('calendar', 22) ?></div>
@@ -61,7 +69,9 @@ layout_start([
     <section class="card">
         <div class="card-header">
             <h2 class="card-title"><?= icon('wallet') ?> Frais de scolarité</h2>
-            <?php if ($reste <= 0): ?>
+            <?php if (!$fraisDefinis): ?>
+                <span class="badge badge-info">Frais non encore définis</span>
+            <?php elseif ($reste <= 0): ?>
                 <span class="badge badge-success"><?= icon('check', 14) ?> Soldé</span>
             <?php elseif ($totalPaye > 0): ?>
                 <span class="badge badge-warning">Paiement partiel</span>
@@ -71,14 +81,20 @@ layout_start([
         </div>
 
         <dl class="info-list">
-            <div><dt>Total dû</dt><dd><?= e(fcfa($montantTotal)) ?></dd></div>
+            <div><dt>Total dû</dt><dd><?= $fraisDefinis ? e(fcfa($montantTotal)) : 'Frais non encore définis' ?></dd></div>
             <div><dt>Déjà payé</dt><dd class="text-success"><?= e(fcfa($totalPaye)) ?></dd></div>
+            <?php if ($fraisDefinis): ?>
             <div><dt>Reste</dt><dd class="<?= $reste > 0 ? 'text-danger' : 'text-success' ?>"><?= e(fcfa($reste)) ?></dd></div>
+            <?php endif; ?>
         </dl>
+        <?php if ($fraisDefinis): ?>
         <div class="progress mt-2" role="progressbar" aria-valuenow="<?= $pourcentage ?>" aria-valuemin="0" aria-valuemax="100">
             <span style="width: <?= $pourcentage ?>%"></span>
         </div>
         <p class="form-help"><?= $pourcentage ?> % des frais réglés</p>
+        <?php else: ?>
+        <p class="form-help mt-2">Le montant des frais de scolarité de cette classe n'a pas encore été fixé par l'établissement.</p>
+        <?php endif; ?>
 
         <h3 class="mt-2 mb-2" style="font-size:1rem">Historique des versements</h3>
         <?php if (!$paiements): ?>

@@ -3,7 +3,19 @@ require_once 'auth_functions.php';
 require_once 'includes/layout.php';
 require_page_access();
 
-const PROF_FILIERES = ['DWM', 'EA', 'COM', 'IMI', 'F3', 'PM'];
+/** Valeurs autorisées pour la filière/série enseignée ('' = toutes les classes). */
+function prof_filieres(): array
+{
+    return array_merge([''], serie_codes());
+}
+
+/** Le professeur appartient-il à l'établissement courant ? */
+function prof_in_etab(PDO $pdo, int $id): ?array
+{
+    $stmt = $pdo->prepare('SELECT * FROM professeurs WHERE id = ? AND etablissement_id = ?');
+    $stmt->execute([$id, etab_id()]);
+    return $stmt->fetch() ?: null;
+}
 
 /** Valide les champs d'un professeur ; retourne [données, erreurs]. */
 function validate_professeur(PDO $pdo, array $in, int $id = 0): array
@@ -20,8 +32,8 @@ function validate_professeur(PDO $pdo, array $in, int $id = 0): array
     if ($data['nom'] === '' || $data['prenoms'] === '') {
         $errors[] = 'Le nom et les prénoms sont obligatoires.';
     }
-    if (!in_array($data['filiere'], PROF_FILIERES, true)) {
-        $errors[] = 'Filière invalide.';
+    if (!in_array($data['filiere'], prof_filieres(), true)) {
+        $errors[] = serie_label() . ' invalide.';
     }
     if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Adresse email invalide.';
@@ -58,24 +70,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('error', implode(' ', $errors));
             } else {
                 $password = random_password();
-                $pdo->prepare('INSERT INTO professeurs (nom, prenoms, filiere, email, telephone, identifiant, mot_de_passe) VALUES (?, ?, ?, ?, ?, ?, ?)')
-                    ->execute([$data['nom'], $data['prenoms'], $data['filiere'], $data['email'], $data['telephone'], $data['identifiant'], password_hash($password, PASSWORD_DEFAULT)]);
+                $pdo->prepare('INSERT INTO professeurs (etablissement_id, nom, prenoms, filiere, email, telephone, identifiant, mot_de_passe) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+                    ->execute([etab_id(), $data['nom'], $data['prenoms'], $data['filiere'], $data['email'], $data['telephone'], $data['identifiant'], password_hash($password, PASSWORD_DEFAULT)]);
                 $_SESSION['one_time_secret'] = ['who' => $data['prenoms'] . ' ' . $data['nom'], 'login' => $data['identifiant'], 'password' => $password];
                 flash('success', 'Professeur ajouté avec succès.');
             }
         } elseif ($action === 'update') {
             [$data, $errors] = validate_professeur($pdo, $_POST, $id);
-            if ($errors) {
+            if (!prof_in_etab($pdo, $id)) {
+                flash('error', 'Professeur introuvable dans cet établissement.');
+            } elseif ($errors) {
                 flash('error', implode(' ', $errors));
             } else {
-                $stmt = $pdo->prepare('UPDATE professeurs SET nom = ?, prenoms = ?, filiere = ?, email = ?, telephone = ?, identifiant = ? WHERE id = ?');
-                $stmt->execute([$data['nom'], $data['prenoms'], $data['filiere'], $data['email'], $data['telephone'], $data['identifiant'], $id]);
+                $stmt = $pdo->prepare('UPDATE professeurs SET nom = ?, prenoms = ?, filiere = ?, email = ?, telephone = ?, identifiant = ? WHERE id = ? AND etablissement_id = ?');
+                $stmt->execute([$data['nom'], $data['prenoms'], $data['filiere'], $data['email'], $data['telephone'], $data['identifiant'], $id, etab_id()]);
                 flash('success', 'Professeur modifié avec succès.');
             }
         } elseif ($action === 'reset_password') {
-            $stmt = $pdo->prepare('SELECT nom, prenoms, identifiant FROM professeurs WHERE id = ?');
-            $stmt->execute([$id]);
-            if ($prof = $stmt->fetch()) {
+            if ($prof = prof_in_etab($pdo, $id)) {
                 $password = random_password();
                 $pdo->prepare('UPDATE professeurs SET mot_de_passe = ? WHERE id = ?')->execute([password_hash($password, PASSWORD_DEFAULT), $id]);
                 $_SESSION['one_time_secret'] = ['who' => $prof['prenoms'] . ' ' . $prof['nom'], 'login' => $prof['identifiant'], 'password' => $password];
@@ -84,8 +96,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('error', 'Professeur introuvable.');
             }
         } elseif ($action === 'delete') {
-            $pdo->prepare('DELETE FROM professeurs WHERE id = ?')->execute([$id]);
-            flash('success', 'Professeur supprimé.');
+            $stmt = $pdo->prepare('DELETE FROM professeurs WHERE id = ? AND etablissement_id = ?');
+            $stmt->execute([$id, etab_id()]);
+            $stmt->rowCount() ? flash('success', 'Professeur supprimé.') : flash('error', 'Professeur introuvable dans cet établissement.');
         }
     } catch (Throwable $e) {
         flash('error', log_error($e));
@@ -93,7 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect('gestion_professeur.php');
 }
 
-$professeurs = $pdo->query('SELECT id, nom, prenoms, filiere, email, telephone, identifiant FROM professeurs ORDER BY nom, prenoms')->fetchAll();
+$stmt = $pdo->prepare('SELECT id, nom, prenoms, filiere, email, telephone, identifiant FROM professeurs WHERE etablissement_id = ? ORDER BY nom, prenoms');
+$stmt->execute([etab_id()]);
+$professeurs = $stmt->fetchAll();
 $secret = $_SESSION['one_time_secret'] ?? null;
 unset($_SESSION['one_time_secret']);
 
@@ -104,11 +119,12 @@ function prof_fields(string $prefix): void
         <div class="form-group"><label for="<?= $prefix ?>nom">Nom</label><input type="text" id="<?= $prefix ?>nom" name="nom" required maxlength="100"></div>
         <div class="form-group"><label for="<?= $prefix ?>prenoms">Prénoms</label><input type="text" id="<?= $prefix ?>prenoms" name="prenoms" required maxlength="100"></div>
         <div class="form-group">
-            <label for="<?= $prefix ?>filiere">Filière</label>
-            <select id="<?= $prefix ?>filiere" name="filiere" required>
-                <option value="">Sélectionner</option>
-                <?php foreach (PROF_FILIERES as $f): ?><option value="<?= e($f) ?>"><?= e($f) ?></option><?php endforeach; ?>
+            <label for="<?= $prefix ?>filiere"><?= e(serie_label()) ?> enseignée</label>
+            <select id="<?= $prefix ?>filiere" name="filiere">
+                <option value="">Toutes les classes</option>
+                <?php foreach (series_libelles() as $f => $lib): ?><option value="<?= e($f) ?>" title="<?= e($lib) ?>"><?= e($f) ?></option><?php endforeach; ?>
             </select>
+            <p class="form-help">« Toutes les classes » : le professeur peut faire l'appel dans toutes les classes de l'établissement.</p>
         </div>
         <div class="form-group"><label for="<?= $prefix ?>identifiant">Identifiant de connexion</label><input type="text" id="<?= $prefix ?>identifiant" name="identifiant" required pattern="[A-Za-z0-9._\-]{1,50}"></div>
         <div class="form-group"><label for="<?= $prefix ?>email">Email</label><input type="email" id="<?= $prefix ?>email" name="email" required maxlength="100"></div>
@@ -140,13 +156,13 @@ layout_start([
     <?php else: ?>
     <div class="table-wrap">
         <table class="table">
-            <thead><tr><th>Nom</th><th>Prénoms</th><th>Filière</th><th>Identifiant</th><th>Email</th><th>Téléphone</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Nom</th><th>Prénoms</th><th><?= e(serie_label()) ?></th><th>Identifiant</th><th>Email</th><th>Téléphone</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($professeurs as $prof): ?>
                 <tr>
                     <td class="fw-bold"><?= e(mb_strtoupper($prof['nom'], 'UTF-8')) ?></td>
                     <td><?= e($prof['prenoms']) ?></td>
-                    <td><span class="badge badge-primary"><?= e($prof['filiere']) ?></span></td>
+                    <td><?= $prof['filiere'] !== '' ? '<span class="badge badge-primary">' . e($prof['filiere']) . '</span>' : '<span class="text-muted">Toutes</span>' ?></td>
                     <td class="code"><?= e($prof['identifiant']) ?></td>
                     <td><?= e($prof['email']) ?></td>
                     <td><?= e($prof['telephone']) ?></td>

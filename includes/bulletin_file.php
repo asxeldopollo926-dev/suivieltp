@@ -59,9 +59,14 @@ function serve_bulletin(bool $download): void
     $eleve = $stmt->fetch();
 
     if (!$bulletin || !$eleve
+        || (int)$bulletin['etablissement_id'] !== (int)$eleve['etablissement_id']
         || $bulletin['classe'] !== $eleve['classe']
         || $bulletin['filiere'] !== $eleve['filiere']) {
         bulletin_fail(404, 'Ce bulletin est introuvable.');
+    }
+    // Le personnel ne voit que les bulletins de l'établissement sur lequel il travaille.
+    if ($isStaff && !$isParent && (int)$eleve['etablissement_id'] !== etab_id()) {
+        bulletin_fail(404, 'Ce bulletin est introuvable dans cet établissement.');
     }
     if (!$isStaff && $bulletin['status'] !== 'oui') {
         bulletin_fail(403, "Ce bulletin n'est pas encore disponible.");

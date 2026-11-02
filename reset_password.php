@@ -18,8 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$id) {
 
 try {
     $password = random_password();
-    $stmt = $pdo->prepare('UPDATE professeurs SET mot_de_passe = ? WHERE id = ?');
-    $stmt->execute([password_hash($password, PASSWORD_DEFAULT), $id]);
+    $stmt = $pdo->prepare('UPDATE professeurs SET mot_de_passe = ? WHERE id = ? AND etablissement_id = ?');
+    $stmt->execute([password_hash($password, PASSWORD_DEFAULT), $id, etab_id()]);
     if ($stmt->rowCount() === 0) {
         http_response_code(404);
         echo json_encode(['success' => false, 'message' => 'Professeur introuvable.']);

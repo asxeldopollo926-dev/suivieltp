@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Espace professeurs - SuiviLTP</title>
     <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="assets/css/app.css?v=2">
+    <link rel="stylesheet" href="assets/css/app.css?v=3">
 </head>
 <body class="auth-page">
     <main class="auth-card">
@@ -69,7 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <button type="submit" class="btn btn-primary btn-block">Se connecter</button>
         </form>
-        <p class="form-help text-center mt-2" style="text-align:center">Mot de passe oublié ? Adressez-vous au secrétariat.</p>
+        <p class="form-help mt-2" style="text-align:center">
+            <a href="mot_de_passe_oublie.php?type=prof">Mot de passe oublié ?</a><br>
+            Sans adresse e-mail enregistrée, adressez-vous au secrétariat.
+        </p>
         <a href="bienvenue.html" class="back-link">← Retour à l'accueil</a>
     </main>
 </body>

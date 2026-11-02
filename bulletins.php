@@ -2,10 +2,9 @@
 require_once 'auth_functions.php';
 require_once 'includes/bulletin_file.php';
 require_once 'includes/layout.php';
+require_once 'includes/notify.php';
 require_page_access();
 
-const CLASSES  = ['2nde', '1ere', 'Tle'];
-const FILIERES = ['DWM', 'EA', 'COM', 'IMI', 'F3', 'PM'];
 const ZIP_MAX_BYTES = 50 * 1024 * 1024;   // 50 Mo par archive
 const PDF_MAX_BYTES = 10 * 1024 * 1024;   // 10 Mo par bulletin
 const ZIP_MAX_ENTRIES = 1000;
@@ -59,8 +58,8 @@ function process_bulletin_zip(PDO $pdo, array $bulletin, string $zipPath): array
         throw new RuntimeException('Archive trop volumineuse (plus de ' . ZIP_MAX_ENTRIES . ' fichiers).');
     }
 
-    $stmt = $pdo->prepare('SELECT id, nom, prenoms FROM eleves WHERE classe = ? AND filiere = ?');
-    $stmt->execute([$bulletin['classe'], $bulletin['filiere']]);
+    $stmt = $pdo->prepare('SELECT id, nom, prenoms FROM eleves WHERE etablissement_id = ? AND classe = ? AND filiere = ?');
+    $stmt->execute([$bulletin['etablissement_id'], $bulletin['classe'], $bulletin['filiere']]);
     $byId = [];
     $byName = [];
     foreach ($stmt->fetchAll() as $eleve) {
@@ -131,6 +130,34 @@ function process_bulletin_zip(PDO $pdo, array $bulletin, string $zipPath): array
     return $report;
 }
 
+/** Bulletin de l'établissement courant (ou null). */
+function bulletin_of_etab(PDO $pdo, int $id): ?array
+{
+    $stmt = $pdo->prepare('SELECT * FROM bulletins WHERE id = ? AND etablissement_id = ?');
+    $stmt->execute([$id, etab_id()]);
+    return $stmt->fetch() ?: null;
+}
+
+/** Met en file un message pour chaque parent (avec e-mail) de la classe du bulletin. Retourne le nombre de messages. */
+function notify_bulletin_published(PDO $pdo, array $bulletin): int
+{
+    $stmt = $pdo->prepare('SELECT * FROM eleves WHERE etablissement_id = ? AND classe = ? AND filiere = ?');
+    $stmt->execute([$bulletin['etablissement_id'], $bulletin['classe'], $bulletin['filiere']]);
+    $count = 0;
+    foreach ($stmt as $eleve) {
+        // Seuls les élèves dont le PDF a été déposé sont prévenus.
+        if (bulletin_pdf_path((int)$bulletin['id'], (int)$eleve['id']) === null) {
+            continue;
+        }
+        $count += notify_parent($eleve, 'bulletin', 'Bulletin disponible',
+            'Le bulletin du semestre ' . $bulletin['semestre'] . ' de ' . mb_strtoupper($eleve['nom'], 'UTF-8') . ' ' . $eleve['prenoms']
+            . ' (' . classe_label($bulletin['classe'], $bulletin['filiere']) . ') est disponible.'
+            . "\nConnectez-vous à l'espace parents avec l'ID " . $eleve['id'] . ' et votre code secret pour le consulter ou le télécharger.',
+            false);
+    }
+    return $count;
+}
+
 // ---------------------------------------------------------------------------
 // Traitement des formulaires (POST -> redirection)
 // ---------------------------------------------------------------------------
@@ -143,26 +170,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $classe = $_POST['classe'] ?? '';
             $filiere = $_POST['filiere'] ?? '';
             $semestre = $_POST['semestre'] ?? '';
-            if (!in_array($classe, CLASSES, true) || !in_array($filiere, FILIERES, true) || !in_array($semestre, ['1', '2'], true)) {
-                flash('error', 'Veuillez choisir une classe, une filière et un semestre valides.');
+            if (!valid_classe_serie($classe, $filiere) || !in_array($semestre, ['1', '2'], true)) {
+                flash('error', 'Veuillez choisir une classe, une ' . mb_strtolower(serie_label(), 'UTF-8') . ' (si la classe en a une) et un semestre valides.');
             } else {
-                $check = $pdo->prepare('SELECT COUNT(*) FROM bulletins WHERE classe = ? AND filiere = ? AND semestre = ?');
-                $check->execute([$classe, $filiere, $semestre]);
+                $check = $pdo->prepare('SELECT COUNT(*) FROM bulletins WHERE etablissement_id = ? AND classe = ? AND filiere = ? AND semestre = ?');
+                $check->execute([etab_id(), $classe, $filiere, $semestre]);
                 if ($check->fetchColumn() > 0) {
-                    flash('error', "Un bulletin existe déjà pour la classe $classe - $filiere (semestre $semestre).");
+                    flash('error', 'Un bulletin existe déjà pour la classe ' . classe_label($classe, $filiere) . " (semestre $semestre).");
                 } else {
-                    $pdo->prepare('INSERT INTO bulletins (classe, filiere, semestre) VALUES (?, ?, ?)')->execute([$classe, $filiere, $semestre]);
+                    $pdo->prepare('INSERT INTO bulletins (etablissement_id, classe, filiere, semestre) VALUES (?, ?, ?, ?)')
+                        ->execute([etab_id(), $classe, $filiere, $semestre]);
                     flash('success', 'Bulletin créé avec succès.');
                 }
             }
         } elseif ($action === 'update_status') {
-            $status = ($_POST['status'] ?? '') === 'oui' ? 'oui' : 'non';
-            $pdo->prepare('UPDATE bulletins SET status = ? WHERE id = ?')->execute([$status, $bulletinId]);
-            flash('success', $status === 'oui' ? 'Bulletin publié : les parents peuvent le consulter.' : 'Bulletin masqué aux parents.');
+            $bulletin = bulletin_of_etab($pdo, $bulletinId);
+            if (!$bulletin) {
+                flash('error', 'Bulletin introuvable.');
+            } else {
+                $status = ($_POST['status'] ?? '') === 'oui' ? 'oui' : 'non';
+                $pdo->prepare('UPDATE bulletins SET status = ? WHERE id = ?')->execute([$status, $bulletinId]);
+                if ($status === 'oui' && $bulletin['status'] !== 'oui') {
+                    $sent = 0;
+                    try {
+                        $sent = notify_bulletin_published($pdo, $bulletin);
+                        notif_process(10);
+                    } catch (Throwable $e) {
+                        log_error($e);
+                    }
+                    flash('success', 'Bulletin publié : les parents peuvent le consulter.'
+                        . ($sent ? " $sent parent(s) prévenu(s) par e-mail (envoi en cours, voir Notifications)." : ''));
+                } else {
+                    flash('success', $status === 'oui' ? 'Bulletin publié.' : 'Bulletin masqué aux parents.');
+                }
+            }
         } elseif ($action === 'upload_zip') {
-            $stmt = $pdo->prepare('SELECT * FROM bulletins WHERE id = ?');
-            $stmt->execute([$bulletinId]);
-            $bulletin = $stmt->fetch();
+            $bulletin = bulletin_of_etab($pdo, $bulletinId);
             $file = $_FILES['bulletin_zip'] ?? null;
 
             if (!$bulletin) {
@@ -186,9 +229,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         } elseif ($action === 'delete_bulletin') {
-            deleteDirectory(BULLETINS_DIR . '/' . $bulletinId);
-            $pdo->prepare('DELETE FROM bulletins WHERE id = ?')->execute([$bulletinId]);
-            flash('success', 'Bulletin et fichiers associés supprimés.');
+            if (bulletin_of_etab($pdo, $bulletinId)) {
+                deleteDirectory(BULLETINS_DIR . '/' . $bulletinId);
+                $pdo->prepare('DELETE FROM bulletins WHERE id = ?')->execute([$bulletinId]);
+                flash('success', 'Bulletin et fichiers associés supprimés.');
+            } else {
+                flash('error', 'Bulletin introuvable.');
+            }
         }
     } catch (RuntimeException $e) {
         flash('error', $e->getMessage());
@@ -198,9 +245,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect('bulletins.php');
 }
 
-// Récupération des bulletins
-$bulletins = $pdo->query("SELECT b.*, (SELECT COUNT(*) FROM eleves e WHERE e.classe = b.classe AND e.filiere = b.filiere) AS nb_eleves
-                          FROM bulletins b ORDER BY b.date_creation DESC")->fetchAll();
+// Récupération des bulletins de l'établissement
+$stmt = $pdo->prepare('SELECT b.*, (SELECT COUNT(*) FROM eleves e WHERE e.etablissement_id = b.etablissement_id AND e.classe = b.classe AND e.filiere = b.filiere) AS nb_eleves
+                       FROM bulletins b WHERE b.etablissement_id = ? ORDER BY b.date_creation DESC');
+$stmt->execute([etab_id()]);
+$bulletins = $stmt->fetchAll();
 
 /** Nombre de PDF effectivement déposés pour un bulletin. */
 function count_bulletin_pdfs(int $bulletinId): int
@@ -256,9 +305,9 @@ layout_start([
             <tbody>
             <?php foreach ($bulletins as $b):
                 $pdfs = count_bulletin_pdfs((int)$b['id']);
-                $label = $b['classe'] . ' ' . $b['filiere'] . ' — semestre ' . $b['semestre']; ?>
+                $label = classe_label($b['classe'], $b['filiere']) . ' — semestre ' . $b['semestre']; ?>
                 <tr>
-                    <td class="fw-bold"><?= e($b['classe']) ?> <span class="badge badge-primary"><?= e($b['filiere']) ?></span></td>
+                    <td class="fw-bold"><?= e($b['classe']) ?><?php if ($b['filiere'] !== ''): ?> <span class="badge badge-primary"><?= e($b['filiere']) ?></span><?php endif; ?></td>
                     <td>Semestre <?= e($b['semestre']) ?></td>
                     <td><?= e(date_fr($b['date_creation'])) ?></td>
                     <td>
@@ -317,20 +366,7 @@ layout_start([
             </div>
             <div class="modal-body">
                 <div class="form-grid">
-                    <div class="form-group">
-                        <label for="classe">Classe</label>
-                        <select name="classe" id="classe" required>
-                            <option value="">Choisir…</option>
-                            <?php foreach (CLASSES as $c): ?><option value="<?= e($c) ?>"><?= e($c) ?></option><?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="filiere">Filière</label>
-                        <select name="filiere" id="filiere" required>
-                            <option value="">Choisir…</option>
-                            <?php foreach (FILIERES as $f): ?><option value="<?= e($f) ?>"><?= e($f) ?></option><?php endforeach; ?>
-                        </select>
-                    </div>
+                    <?= classe_serie_selects() ?>
                     <div class="form-group">
                         <label for="semestre">Semestre</label>
                         <select name="semestre" id="semestre" required>

@@ -3,13 +3,15 @@ require_once 'auth_functions.php';
 require_once 'includes/layout.php';
 require_page_access();
 
-// Filtres
-$filiere = $_GET['filiere'] ?? '';
-$classe  = $_GET['classe'] ?? '';
+$etabId = etab_id();
+
+// Filtres (limités aux classes / séries de l'établissement)
+$filiere = in_array($_GET['filiere'] ?? '', serie_codes(), true) ? $_GET['filiere'] : '';
+$classe  = in_array($_GET['classe'] ?? '', classe_codes(), true) ? $_GET['classe'] : '';
 $search  = trim($_GET['search'] ?? '');
 
-$where = ' WHERE 1=1';
-$params = [];
+$where = ' WHERE etablissement_id = ?';
+$params = [$etabId];
 if ($filiere !== '') { $where .= ' AND filiere = ?'; $params[] = $filiere; }
 if ($classe !== '')  { $where .= ' AND classe = ?';  $params[] = $classe; }
 if ($search !== '')  {
@@ -29,25 +31,30 @@ $stmt = $pdo->prepare('SELECT * FROM eleves' . $where . ' ORDER BY nom, prenoms 
 $stmt->execute($params);
 $eleves = $stmt->fetchAll();
 
-$filieres = $pdo->query('SELECT DISTINCT filiere FROM eleves ORDER BY filiere')->fetchAll(PDO::FETCH_COLUMN);
-$classes  = $pdo->query("SELECT DISTINCT classe FROM eleves ORDER BY FIELD(classe, '2nde', '1ere', 'Tle')")->fetchAll(PDO::FETCH_COLUMN);
-
-// Indicateurs
+// Indicateurs de l'établissement
+$q = function (string $sql) use ($pdo, $etabId) {
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$etabId]);
+    return $stmt->fetchColumn();
+};
 $stats = [
-    'eleves'     => (int)$pdo->query('SELECT COUNT(*) FROM eleves')->fetchColumn(),
-    'profs'      => (int)$pdo->query('SELECT COUNT(*) FROM professeurs')->fetchColumn(),
-    'bulletins'  => (int)$pdo->query("SELECT COUNT(*) FROM bulletins WHERE status = 'oui'")->fetchColumn(),
-    'encaisse'   => (float)$pdo->query('SELECT COALESCE(SUM(montant), 0) FROM paiements')->fetchColumn(),
-    'absences'   => (int)$pdo->query("SELECT COUNT(*) FROM absences WHERE statut IN ('Absent','Absente') AND date_absence >= (CURDATE() - INTERVAL 30 DAY)")->fetchColumn(),
+    'eleves'    => (int)$q('SELECT COUNT(*) FROM eleves WHERE etablissement_id = ?'),
+    'profs'     => (int)$q('SELECT COUNT(*) FROM professeurs WHERE etablissement_id = ?'),
+    'bulletins' => (int)$q("SELECT COUNT(*) FROM bulletins WHERE status = 'oui' AND etablissement_id = ?"),
+    'encaisse'  => (float)$q('SELECT COALESCE(SUM(p.montant), 0) FROM paiements p JOIN eleves e ON e.id = p.eleve_id WHERE e.etablissement_id = ?'),
+    'absences'  => (int)$q("SELECT COUNT(*) FROM absences a JOIN eleves e ON e.id = a.eleve_id
+                            WHERE e.etablissement_id = ? AND a.statut IN ('Absent','Absente') AND a.date_absence >= (CURDATE() - INTERVAL 30 DAY)"),
 ];
-$professeurs = $pdo->query('SELECT * FROM professeurs ORDER BY nom')->fetchAll();
+$stmt = $pdo->prepare('SELECT * FROM professeurs WHERE etablissement_id = ? ORDER BY nom');
+$stmt->execute([$etabId]);
+$professeurs = $stmt->fetchAll();
 
 $canSeeStudents = canAccessPage('eleve_details.php');
 $canSeePayments = canAccessPage('paiements.php');
 
 layout_start([
     'title'    => 'Tableau de bord',
-    'subtitle' => 'Bonjour ' . ($_SESSION['admin_username'] ?? '') . ', voici la situation de l\'établissement.',
+    'subtitle' => 'Bonjour ' . ($_SESSION['admin_username'] ?? '') . ', voici la situation de : ' . (current_etab()['nom'] ?? '') . '.',
 ]);
 ?>
 <div class="stats-grid">
@@ -88,18 +95,7 @@ layout_start([
             <?= icon('search', 18) ?>
             <input type="search" name="search" placeholder="Nom, prénom ou ID…" value="<?= e($search) ?>">
         </div>
-        <select name="classe" data-autosubmit>
-            <option value="">Toutes les classes</option>
-            <?php foreach ($classes as $c): ?>
-                <option value="<?= e($c) ?>" <?= $classe === $c ? 'selected' : '' ?>><?= e($c) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <select name="filiere" data-autosubmit>
-            <option value="">Toutes les filières</option>
-            <?php foreach ($filieres as $f): ?>
-                <option value="<?= e($f) ?>" <?= $filiere === $f ? 'selected' : '' ?>><?= e($f) ?></option>
-            <?php endforeach; ?>
-        </select>
+        <?= classe_serie_selects($classe, $filiere, ['filter' => true]) ?>
         <button type="submit" class="btn btn-primary"><?= icon('search', 16) ?> Rechercher</button>
         <?php if ($search !== '' || $classe !== '' || $filiere !== ''): ?>
             <a href="admin.php" class="btn btn-secondary">Réinitialiser</a>
@@ -113,7 +109,7 @@ layout_start([
         <table class="table">
             <thead>
                 <tr>
-                    <th>ID</th><th>Nom</th><th>Prénoms</th><th>Sexe</th><th>Naissance</th><th>Filière</th><th>Classe</th>
+                    <th>ID</th><th>Nom</th><th>Prénoms</th><th>Sexe</th><th>Naissance</th><th>Classe</th><th><?= e(serie_label()) ?></th>
                     <?php if ($canSeeStudents || $canSeePayments): ?><th>Actions</th><?php endif; ?>
                 </tr>
             </thead>
@@ -125,8 +121,8 @@ layout_start([
                     <td><?= e($eleve['prenoms']) ?></td>
                     <td><?= e($eleve['sexe']) ?></td>
                     <td><?= e(date_fr($eleve['date_naissance'])) ?></td>
-                    <td><span class="badge badge-primary"><?= e($eleve['filiere']) ?></span></td>
                     <td><?= e($eleve['classe']) ?></td>
+                    <td><?= $eleve['filiere'] !== '' ? '<span class="badge badge-primary">' . e($eleve['filiere']) . '</span>' : '<span class="text-muted">—</span>' ?></td>
                     <?php if ($canSeeStudents || $canSeePayments): ?>
                     <td class="actions">
                         <?php if ($canSeeStudents): ?>
@@ -158,13 +154,13 @@ layout_start([
     <?php else: ?>
     <div class="table-wrap">
         <table class="table">
-            <thead><tr><th>Nom</th><th>Prénoms</th><th>Filière</th><th>Email</th><th>Téléphone</th></tr></thead>
+            <thead><tr><th>Nom</th><th>Prénoms</th><th><?= e(serie_label()) ?></th><th>Email</th><th>Téléphone</th></tr></thead>
             <tbody>
             <?php foreach ($professeurs as $prof): ?>
                 <tr>
                     <td class="fw-bold"><?= e(mb_strtoupper($prof['nom'], 'UTF-8')) ?></td>
                     <td><?= e($prof['prenoms']) ?></td>
-                    <td><span class="badge badge-primary"><?= e($prof['filiere']) ?></span></td>
+                    <td><?= $prof['filiere'] !== '' ? '<span class="badge badge-primary">' . e($prof['filiere']) . '</span>' : '<span class="text-muted">Toutes</span>' ?></td>
                     <td><?= e($prof['email']) ?></td>
                     <td><?= e($prof['telephone']) ?></td>
                 </tr>

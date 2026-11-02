@@ -5,32 +5,35 @@ require_once 'includes/frais.php';
 require_page_access();
 
 const FRAIS_MAX = 10000000;
+const SERIE_VIDE = '_';   // jeton utilisé dans les noms de champs pour une classe sans série
+
+$etabId = etab_id();
+$combos = classe_serie_combos();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $saisie = $_POST['frais'] ?? [];
     $erreurs = 0;
     $valeurs = [];
-    foreach (FRAIS_CLASSES as $classe) {
-        foreach (FRAIS_FILIERES as $filiere) {
-            $m = $saisie[$classe][$filiere]['M'] ?? '';
-            $f = $saisie[$classe][$filiere]['F'] ?? '';
-            $m = str_replace([' ', "\u{00A0}", '.'], '', (string)$m);
-            $f = str_replace([' ', "\u{00A0}", '.'], '', (string)$f);
-            if (!ctype_digit($m) || !ctype_digit($f) || (int)$m > FRAIS_MAX || (int)$f > FRAIS_MAX) {
-                $erreurs++;
-                continue;
-            }
-            $valeurs[] = [(int)$m, (int)$f, $classe, $filiere];
+    foreach ($combos as [$classe, $serie]) {
+        $key = $serie === '' ? SERIE_VIDE : $serie;
+        $m = str_replace([' ', "\u{00A0}", '.'], '', (string)($saisie[$classe][$key]['M'] ?? ''));
+        $f = str_replace([' ', "\u{00A0}", '.'], '', (string)($saisie[$classe][$key]['F'] ?? ''));
+        if (!ctype_digit($m) || !ctype_digit($f) || (int)$m > FRAIS_MAX || (int)$f > FRAIS_MAX) {
+            $erreurs++;
+            continue;
         }
+        $valeurs[] = [$etabId, $classe, $serie, (int)$m, (int)$f];
     }
 
-    if ($erreurs > 0) {
+    if (!$combos) {
+        flash('error', "Aucune classe n'est configurée pour cet établissement.");
+    } elseif ($erreurs > 0) {
         flash('error', "$erreurs ligne(s) contiennent un montant invalide (nombre entier entre 0 et 10 000 000). Rien n'a été enregistré.");
     } else {
         try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare(
-                'INSERT INTO frais_scolaires (montant_garcon, montant_fille, classe, filiere) VALUES (?, ?, ?, ?)
+                'INSERT INTO frais_scolaires (etablissement_id, classe, filiere, montant_garcon, montant_fille) VALUES (?, ?, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE montant_garcon = VALUES(montant_garcon), montant_fille = VALUES(montant_fille)'
             );
             foreach ($valeurs as $v) {
@@ -39,35 +42,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->commit();
             flash('success', 'Grille des frais enregistrée. Les soldes des élèves sont recalculés automatiquement.');
         } catch (Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             flash('error', log_error($e));
         }
     }
     redirect('frais_scolaires.php');
 }
 
-$grille = frais_grille();
+$grille = frais_grille($etabId);
 
-// Effectifs par classe / filière / sexe pour estimer les recettes attendues
+// Effectifs par classe / série / sexe de l'établissement, pour estimer les recettes attendues
 $effectifs = [];
-foreach ($pdo->query('SELECT classe, filiere, sexe, COUNT(*) AS n FROM eleves GROUP BY classe, filiere, sexe') as $row) {
+$stmt = $pdo->prepare('SELECT classe, filiere, sexe, COUNT(*) AS n FROM eleves WHERE etablissement_id = ? GROUP BY classe, filiere, sexe');
+$stmt->execute([$etabId]);
+foreach ($stmt as $row) {
     $effectifs[$row['classe']][$row['filiere']][$row['sexe']] = (int)$row['n'];
 }
 $totalAttendu = 0;
-foreach ($effectifs as $classe => $parFiliere) {
-    foreach ($parFiliere as $filiere => $parSexe) {
+foreach ($effectifs as $classe => $parSerie) {
+    foreach ($parSerie as $serie => $parSexe) {
         foreach ($parSexe as $sexe => $n) {
-            $totalAttendu += $n * montant_total(['classe' => $classe, 'filiere' => $filiere, 'sexe' => $sexe]);
+            $totalAttendu += $n * montant_total(['etablissement_id' => $etabId, 'classe' => $classe, 'filiere' => $serie, 'sexe' => $sexe]);
         }
     }
 }
-$totalEncaisse = (float)$pdo->query('SELECT COALESCE(SUM(montant), 0) FROM paiements')->fetchColumn();
+$stmt = $pdo->prepare('SELECT COALESCE(SUM(p.montant), 0) FROM paiements p JOIN eleves e ON e.id = p.eleve_id WHERE e.etablissement_id = ?');
+$stmt->execute([$etabId]);
+$totalEncaisse = (float)$stmt->fetchColumn();
+
+// Lignes encore à 0 (grille à compléter)
+$aCompleter = 0;
+foreach ($combos as [$classe, $serie]) {
+    $g = $grille[$classe][$serie] ?? ['M' => 0, 'F' => 0];
+    if ($g['M'] === 0 || $g['F'] === 0) {
+        $aCompleter++;
+    }
+}
 
 layout_start([
     'title'    => 'Frais scolaires',
-    'subtitle' => 'Montant annuel de la scolarité par classe, filière et sexe — année ' . annee_scolaire(),
+    'subtitle' => 'Montant annuel de la scolarité par classe, ' . mb_strtolower(serie_label(), 'UTF-8') . ' et sexe — '
+                  . (current_etab()['nom'] ?? '') . ' — année ' . annee_scolaire(),
 ]);
 ?>
+<?php if ($aCompleter > 0): ?>
+<div class="alert alert-warning">
+    <?= icon('alert', 18) ?>
+    <div><strong>Grille à compléter :</strong> <?= $aCompleter ?> ligne(s) ont encore un montant à 0.
+        Tant qu'un montant vaut 0, le reste à payer des élèves concernés apparaît « Non défini ».</div>
+</div>
+<?php endif; ?>
+
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-icon"><?= icon('tag', 22) ?></div>
@@ -83,6 +110,9 @@ layout_start([
     </div>
 </div>
 
+<?php if (!$combos): ?>
+    <div class="card empty-state"><?= icon('tag', 40) ?><p>Aucune classe n'est configurée pour cet établissement.</p></div>
+<?php else: ?>
 <form method="POST" class="card">
     <?= csrf_field() ?>
     <div class="card-header">
@@ -98,34 +128,36 @@ layout_start([
             <thead>
                 <tr>
                     <th>Classe</th>
-                    <th>Filière</th>
+                    <th><?= e(serie_label()) ?></th>
                     <th class="num">Élèves</th>
                     <th>Garçons</th>
                     <th>Filles</th>
                 </tr>
             </thead>
             <tbody>
-            <?php foreach (FRAIS_CLASSES as $classe): ?>
-                <?php foreach (FRAIS_FILIERES as $i => $filiere):
-                    $m = $grille[$classe][$filiere]['M'] ?? frais_par_defaut($filiere, 'M');
-                    $f = $grille[$classe][$filiere]['F'] ?? frais_par_defaut($filiere, 'F');
-                    $nM = $effectifs[$classe][$filiere]['M'] ?? 0;
-                    $nF = $effectifs[$classe][$filiere]['F'] ?? 0;
-                    $name = 'frais[' . $classe . '][' . $filiere . ']'; ?>
-                <tr<?= $i === 0 ? ' style="border-top:2px solid var(--border)"' : '' ?>>
-                    <td class="fw-bold"><?= $i === 0 ? e($classe) : '' ?></td>
-                    <td><span class="badge badge-primary"><?= e($filiere) ?></span></td>
+            <?php $previous = null;
+            foreach ($combos as [$classe, $serie]):
+                $first = $classe !== $previous;
+                $previous = $classe;
+                $m = $grille[$classe][$serie]['M'] ?? 0;
+                $f = $grille[$classe][$serie]['F'] ?? 0;
+                $nM = $effectifs[$classe][$serie]['M'] ?? 0;
+                $nF = $effectifs[$classe][$serie]['F'] ?? 0;
+                $name = 'frais[' . $classe . '][' . ($serie === '' ? SERIE_VIDE : $serie) . ']';
+                $label = classe_label($classe, $serie); ?>
+                <tr<?= $first ? ' style="border-top:2px solid var(--border)"' : '' ?>>
+                    <td class="fw-bold"><?= $first ? e($classe) : '' ?></td>
+                    <td><?= $serie !== '' ? '<span class="badge badge-primary">' . e($serie) . '</span>' : '<span class="text-muted">—</span>' ?></td>
                     <td class="num text-muted"><?= $nM + $nF ?> <small>(<?= $nM ?> G / <?= $nF ?> F)</small></td>
                     <td>
                         <input class="input" type="number" min="0" max="<?= FRAIS_MAX ?>" step="500" name="<?= e($name) ?>[M]" value="<?= $m ?>"
-                               aria-label="Frais garçons <?= e("$classe $filiere") ?>" style="max-width:160px" required>
+                               aria-label="Frais garçons <?= e($label) ?>" style="max-width:160px" required>
                     </td>
                     <td>
                         <input class="input" type="number" min="0" max="<?= FRAIS_MAX ?>" step="500" name="<?= e($name) ?>[F]" value="<?= $f ?>"
-                               aria-label="Frais filles <?= e("$classe $filiere") ?>" style="max-width:160px" required>
+                               aria-label="Frais filles <?= e($label) ?>" style="max-width:160px" required>
                     </td>
                 </tr>
-                <?php endforeach; ?>
             <?php endforeach; ?>
             </tbody>
         </table>
@@ -134,4 +166,5 @@ layout_start([
         <button type="submit" class="btn btn-primary"><?= icon('check', 18) ?> Enregistrer la grille</button>
     </div>
 </form>
+<?php endif; ?>
 <?php layout_end(); ?>
