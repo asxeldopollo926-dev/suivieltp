@@ -14,6 +14,13 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 
 // ---------------------------------------------------------------------------
+// Établissement (affiché sur les reçus et documents imprimés)
+// ---------------------------------------------------------------------------
+define('SCHOOL_NAME', 'Lycée Technique et Professionnel de Tchaourou');
+define('SCHOOL_CITY', 'Tchaourou');
+define('SCHOOL_CONTACT', 'www.lyceetchaourou.bj');
+
+// ---------------------------------------------------------------------------
 // Mode debug : à laisser à false (sinon les erreurs PHP s'affichent à l'écran)
 // ---------------------------------------------------------------------------
 define('APP_DEBUG', false);

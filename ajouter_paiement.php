@@ -1,18 +1,10 @@
 <?php
 require_once 'auth_functions.php';
 require_once 'includes/layout.php';
+require_once 'includes/frais.php';
 require_page_access();
 
 const MODES_PAIEMENT = ['Espèces', 'Reçu CLCAM', 'Chèque', 'Mobile Money'];
-
-/** Montant annuel dû (à déplacer plus tard vers la table frais_scolaires). */
-function montant_total(array $eleve): int
-{
-    if ($eleve['filiere'] === 'COM') {
-        return 53000;
-    }
-    return $eleve['sexe'] === 'M' ? 120000 : 80000;
-}
 
 $eleveId = (int)($_GET['id'] ?? 0);
 $stmt = $pdo->prepare('SELECT * FROM eleves WHERE id = ?');
@@ -59,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->prepare('INSERT INTO paiements (eleve_id, montant, mode_paiement, date_paiement) VALUES (?, ?, ?, ?)')
                 ->execute([$eleveId, (int)$form['montant'], $form['mode_paiement'], $form['date_paiement']]);
-            flash('success', 'Paiement de ' . fcfa($form['montant']) . ' enregistré.');
-            redirect('paiement_details.php?id=' . $eleveId);
+            // On ouvre directement le reçu, prêt à être imprimé et remis au parent.
+            redirect('recu.php?id=' . (int)$pdo->lastInsertId() . '&nouveau=1');
         } catch (Throwable $e) {
             $errors[] = log_error($e);
         }

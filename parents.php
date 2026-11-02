@@ -2,11 +2,12 @@
 require_once 'auth_functions.php';
 require_once 'includes/layout.php';
 require_once 'includes/bulletin_file.php';
+require_once 'includes/frais.php';
 $eleve = require_parent();
 $eleveId = (int)$eleve['id'];
 
-// Montant annuel dû (COM : 53 000 ; autres filières : 120 000 garçons / 80 000 filles)
-$montantTotal = $eleve['filiere'] === 'COM' ? 53000 : ($eleve['sexe'] === 'M' ? 120000 : 80000);
+// Montant annuel dû selon la grille des frais (page Frais scolaires)
+$montantTotal = montant_total($eleve);
 
 $stmt = $pdo->prepare('SELECT * FROM paiements WHERE eleve_id = ? ORDER BY date_paiement DESC, id DESC');
 $stmt->execute([$eleveId]);
@@ -85,13 +86,14 @@ layout_start([
         <?php else: ?>
         <div class="table-wrap">
             <table class="table">
-                <thead><tr><th>Date</th><th>Mode</th><th class="num">Montant</th></tr></thead>
+                <thead><tr><th>Date</th><th>Mode</th><th class="num">Montant</th><th></th></tr></thead>
                 <tbody>
                 <?php foreach ($paiements as $p): ?>
                     <tr>
                         <td><?= e(date_fr($p['date_paiement'])) ?></td>
                         <td><?= e($p['mode_paiement']) ?></td>
                         <td class="num fw-bold"><?= e(fcfa($p['montant'])) ?></td>
+                        <td><a href="recu.php?id=<?= (int)$p['id'] ?>" class="btn btn-sm btn-outline"><?= icon('receipt', 16) ?> Reçu</a></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

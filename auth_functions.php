@@ -36,7 +36,9 @@ const ROLE_PAGES = [
     'paiement_details.php'        => ['comptable'],
     'ajouter_paiement.php'        => ['comptable'],
     'reinitialiser_paiements.php' => ['comptable'],
-    'gestion_professeur.php'      => ['secretaire'],
+    'frais_scolaires.php'         => ['comptable'],
+    'recu.php'                    => ['comptable'],   // les parents y ont aussi accès pour leur enfant
+    'gestion_professeur.php'    => ['secretaire'],
     'reset_password.php'          => ['secretaire'],
     'utilisateurs.php'            => [],          // administrateur uniquement
 ];
@@ -47,6 +49,7 @@ const ADMIN_MENU = [
     ['href' => 'eleves.php',             'label' => 'Élèves',          'icon' => 'users'],
     ['href' => 'bulletins.php',          'label' => 'Bulletins',       'icon' => 'file'],
     ['href' => 'paiements.php',          'label' => 'Paiements',       'icon' => 'wallet'],
+    ['href' => 'frais_scolaires.php',    'label' => 'Frais scolaires', 'icon' => 'tag'],
     ['href' => 'gestion_professeur.php', 'label' => 'Professeurs',     'icon' => 'teacher'],
     ['href' => 'utilisateurs.php',       'label' => 'Utilisateurs',    'icon' => 'shield'],
     ['href' => 'parametres.php',         'label' => 'Paramètres',      'icon' => 'settings'],

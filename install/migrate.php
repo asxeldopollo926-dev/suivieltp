@@ -109,4 +109,29 @@ step('Codes secrets des élèves', function () use ($pdo) {
     }
 });
 
+// 7. Grille des frais de scolarité (initialisée avec les montants appliqués jusqu'ici)
+step('Table `frais_scolaires`', function () use ($pdo) {
+    require_once __DIR__ . '/../includes/frais.php';
+    if (!column_exists($pdo, 'frais_scolaires', 'montant_garcon')) {
+        // L'ancien script create_frais_scolaires.sql créait une table sans distinction garçon/fille.
+        $pdo->exec('DROP TABLE IF EXISTS frais_scolaires');
+    }
+    $pdo->exec("CREATE TABLE IF NOT EXISTS frais_scolaires (
+        id INT NOT NULL AUTO_INCREMENT,
+        classe ENUM('2nde','1ere','Tle') NOT NULL,
+        filiere ENUM('DWM','EA','COM','IMI','F3','PM') NOT NULL,
+        montant_garcon INT UNSIGNED NOT NULL,
+        montant_fille INT UNSIGNED NOT NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY classe_filiere (classe, filiere)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $insert = $pdo->prepare('INSERT IGNORE INTO frais_scolaires (classe, filiere, montant_garcon, montant_fille) VALUES (?, ?, ?, ?)');
+    foreach (FRAIS_CLASSES as $classe) {
+        foreach (FRAIS_FILIERES as $filiere) {
+            $insert->execute([$classe, $filiere, frais_par_defaut($filiere, 'M'), frais_par_defaut($filiere, 'F')]);
+        }
+    }
+});
+
 echo "Migration terminée.\n";

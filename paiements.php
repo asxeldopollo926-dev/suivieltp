@@ -1,16 +1,8 @@
 <?php
 require_once 'auth_functions.php';
 require_once 'includes/layout.php';
+require_once 'includes/frais.php';
 require_page_access();
-
-/** Montant annuel dû (à déplacer plus tard vers la table frais_scolaires). */
-function montant_total(array $eleve): int
-{
-    if ($eleve['filiere'] === 'COM') {
-        return 53000;
-    }
-    return $eleve['sexe'] === 'M' ? 120000 : 80000;
-}
 
 // Filtres
 $filiere = $_GET['filiere'] ?? '';
@@ -50,7 +42,7 @@ $classes  = $pdo->query("SELECT DISTINCT classe FROM eleves ORDER BY FIELD(class
 $totalEncaisse = (float)$pdo->query('SELECT COALESCE(SUM(montant), 0) FROM paiements')->fetchColumn();
 $totalDu = 0;
 $soldes = 0;
-$rows = $pdo->query('SELECT e.filiere, e.sexe, COALESCE(SUM(p.montant), 0) AS paye FROM eleves e LEFT JOIN paiements p ON p.eleve_id = e.id GROUP BY e.id')->fetchAll();
+$rows = $pdo->query('SELECT e.classe, e.filiere, e.sexe, COALESCE(SUM(p.montant), 0) AS paye FROM eleves e LEFT JOIN paiements p ON p.eleve_id = e.id GROUP BY e.id')->fetchAll();
 foreach ($rows as $r) {
     $du = montant_total($r);
     $totalDu += $du;

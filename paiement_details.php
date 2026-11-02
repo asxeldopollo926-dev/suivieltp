@@ -1,16 +1,8 @@
 <?php
 require_once 'auth_functions.php';
 require_once 'includes/layout.php';
+require_once 'includes/frais.php';
 require_page_access();
-
-/** Montant annuel dû (à déplacer plus tard vers la table frais_scolaires). */
-function montant_total(array $eleve): int
-{
-    if ($eleve['filiere'] === 'COM') {
-        return 53000;
-    }
-    return $eleve['sexe'] === 'M' ? 120000 : 80000;
-}
 
 $eleveId = (int)($_GET['id'] ?? 0);
 $stmt = $pdo->prepare('SELECT * FROM eleves WHERE id = ?');
@@ -120,7 +112,8 @@ layout_start([
                     <td><?= e(date_fr($p['date_paiement'])) ?></td>
                     <td class="num fw-bold"><?= e(fcfa($p['montant'])) ?></td>
                     <td><?= e($p['mode_paiement']) ?></td>
-                    <td class="no-print">
+                    <td class="no-print actions">
+                        <a href="recu.php?id=<?= (int)$p['id'] ?>" class="btn btn-sm btn-outline"><?= icon('receipt', 16) ?> Reçu</a>
                         <form method="POST" class="inline" data-confirm="Supprimer ce paiement de <?= e(fcfa($p['montant'])) ?> ?" data-confirm-label="Supprimer">
                             <?= csrf_field() ?>
                             <input type="hidden" name="action" value="delete_paiement">
